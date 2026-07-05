@@ -22,7 +22,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       # ٣) تثبيت Java (مطلوب لـ Gradle)
       - name: Setup Java 17
@@ -35,13 +34,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ٥) تثبيت حزم المشروع
+      # ٥) تثبيت حزم المشروع (بدون الحاجة لـ package-lock.json)
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
 
       # ٦) تثبيت Capacitor CLI
       - name: Install Capacitor CLI
-        run: npm install -g @capacitor/cli
+        run: npm install -g @capacitor/cli --no-package-lock
 
       # ٧) إضافة منصة Android (لو مش موجودة)
       - name: Add Android platform
