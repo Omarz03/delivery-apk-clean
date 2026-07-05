@@ -1,4 +1,4 @@
-name: نشر على GitHub Pages (offline كامل)
+name: نشر على GitHub Pages
 
 on:
   push:
@@ -6,68 +6,33 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
-      - name: تحميل المكتبات عبر npm وتجهيز الملفات
-        run: |
-          mkdir -p dist/libs
-          cp -r public/* dist/
-          
-          # تحميل المكتبات عبر npm (أكثر موثوقية من curl)
-          npm install --no-package-lock \
-            xlsx \
-            qrcodejs2 \
-            html5-qrcode \
-            tailwindcss
-          
-          # نسخ الملفات المحلية
-          cp node_modules/xlsx/dist/xlsx.full.min.js dist/libs/
-          cp node_modules/qrcodejs2/qrcode.min.js dist/libs/ 2>/dev/null || \
-            cp node_modules/qrcodejs2/qrcode.js dist/libs/qrcode.min.js
-          cp node_modules/html5-qrcode/html5-qrcode.min.js dist/libs/ 2>/dev/null || \
-            find node_modules/html5-qrcode -name "*.min.js" | head -1 | xargs -I{} cp {} dist/libs/html5-qrcode.min.js
-          
-          # توليد Tailwind CSS
-          npx tailwindcss \
-            -i /dev/stdin \
-            -o dist/libs/tailwind.min.css \
-            --content "dist/index.html" \
-            --minify << 'TWEOF'
-          @tailwind base;
-          @tailwind components;
-          @tailwind utilities;
-          TWEOF
-          
-          echo "=== حجم الملفات ==="
-          ls -lh dist/libs/
-          
-          # تعديل index.html
-          sed -i 's|<script src="https://cdn.tailwindcss.com"></script>|<link rel="stylesheet" href="libs/tailwind.min.css" />|g' dist/index.html
-          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js|libs/xlsx.full.min.js|g' dist/index.html
-          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js|libs/qrcode.min.js|g' dist/index.html
-          sed -i 's|https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js|libs/html5-qrcode.min.js|g' dist/index.html
-          sed -i '/tailwind\.config/,/<\/script>/d' dist/index.html
-          
-          echo "=== CDN references remaining ==="
-          grep -n "cdn\.\|unpkg\.\|cdnjs\." dist/index.html || echo "✅ Zero CDN references"
-
-      - name: نشر على gh-pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload public/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
-          force_orphan: true
+          path: ./public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
