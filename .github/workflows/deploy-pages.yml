@@ -16,70 +16,58 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: تحميل المكتبات وتعديل index.html ونشر gh-pages
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: تحميل المكتبات عبر npm وتجهيز الملفات
         run: |
-          # إنشاء مجلد النشر
           mkdir -p dist/libs
-          
-          # نسخ كل ملفات public
           cp -r public/* dist/
           
-          # تحميل المكتبات
-          echo "تحميل xlsx..."
-          curl -fL "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" \
-            -o dist/libs/xlsx.full.min.js
-          echo "xlsx: $(wc -c < dist/libs/xlsx.full.min.js) bytes"
+          # تحميل المكتبات عبر npm (أكثر موثوقية من curl)
+          npm install --no-package-lock \
+            xlsx \
+            qrcodejs2 \
+            html5-qrcode \
+            tailwindcss
           
-          echo "تحميل qrcode..."
-          curl -fL "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" \
-            -o dist/libs/qrcode.min.js
-          echo "qrcode: $(wc -c < dist/libs/qrcode.min.js) bytes"
+          # نسخ الملفات المحلية
+          cp node_modules/xlsx/dist/xlsx.full.min.js dist/libs/
+          cp node_modules/qrcodejs2/qrcode.min.js dist/libs/ 2>/dev/null || \
+            cp node_modules/qrcodejs2/qrcode.js dist/libs/qrcode.min.js
+          cp node_modules/html5-qrcode/html5-qrcode.min.js dist/libs/ 2>/dev/null || \
+            find node_modules/html5-qrcode -name "*.min.js" | head -1 | xargs -I{} cp {} dist/libs/html5-qrcode.min.js
           
-          echo "تحميل html5-qrcode..."
-          curl -fL "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" \
-            -o dist/libs/html5-qrcode.min.js
-          echo "html5-qrcode: $(wc -c < dist/libs/html5-qrcode.min.js) bytes"
+          # توليد Tailwind CSS
+          npx tailwindcss \
+            -i /dev/stdin \
+            -o dist/libs/tailwind.min.css \
+            --content "dist/index.html" \
+            --minify << 'TWEOF'
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
+          TWEOF
           
-          echo "تحميل tailwind..."
-          curl -fL "https://unpkg.com/tailwindcss@3.4.1/dist/tailwind.min.css" \
-            -o dist/libs/tailwind.min.css
-          echo "tailwind: $(wc -c < dist/libs/tailwind.min.css) bytes"
+          echo "=== حجم الملفات ==="
+          ls -lh dist/libs/
           
           # تعديل index.html
           sed -i 's|<script src="https://cdn.tailwindcss.com"></script>|<link rel="stylesheet" href="libs/tailwind.min.css" />|g' dist/index.html
           sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js|libs/xlsx.full.min.js|g' dist/index.html
           sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js|libs/qrcode.min.js|g' dist/index.html
           sed -i 's|https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js|libs/html5-qrcode.min.js|g' dist/index.html
-          
-          # حذف إعداد Tailwind JS
-          sed -i '/<script>/{/tailwind\.config/,/<\/script>/d}' dist/index.html
+          sed -i '/tailwind\.config/,/<\/script>/d' dist/index.html
           
           echo "=== CDN references remaining ==="
           grep -n "cdn\.\|unpkg\.\|cdnjs\." dist/index.html || echo "✅ Zero CDN references"
-          
-          echo "=== ملفات dist ==="
-          ls -lh dist/libs/
-          
-          # نشر على gh-pages
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          
-          git add -f dist/
-          
-          # إنشاء gh-pages branch أو تحديثه
-          git fetch origin gh-pages 2>/dev/null || true
-          
-          # حفظ محتوى dist مؤقتاً
-          cp -r dist /tmp/deploy-dist
-          
-          # التحويل لـ gh-pages
-          git checkout --orphan gh-pages-new
-          git rm -rf . --quiet
-          
-          cp -r /tmp/deploy-dist/* .
-          
-          git add .
-          git commit -m "Deploy offline PWA - $(date '+%Y-%m-%d %H:%M')"
-          git push origin HEAD:gh-pages --force
-          
-          echo "✅ تم النشر على gh-pages"
+
+      - name: نشر على gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
