@@ -1,0 +1,81 @@
+name: بناء APK
+
+on:
+  # يبني تلقائياً عند رفع أي تعديل على الكود
+  push:
+    branches: [main]
+  # أو يدوياً بضغطة زر من صفحة GitHub
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ١) تحميل الكود
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ٢) تثبيت Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ٣) تثبيت Java (مطلوب لـ Gradle)
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ٤) تثبيت Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ٥) تثبيت حزم المشروع
+      - name: Install dependencies
+        run: npm install
+
+      # ٦) تثبيت Capacitor CLI
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
+
+      # ٧) إضافة منصة Android (لو مش موجودة)
+      - name: Add Android platform
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+      # ٨) نسخ ملف الصلاحيات
+      - name: Copy AndroidManifest
+        run: |
+          cp AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
+      # ٩) مزامنة ملفات الويب مع Android
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # ١٠) بناء APK
+      - name: Build Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      # ١١) رفع APK كـ artifact قابل للتحميل
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: delivery-apk-${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      # ١٢) عرض رابط التحميل في السجل
+      - name: Build complete
+        run: |
+          echo "✅ APK جاهز للتحميل"
+          echo "اذهب إلى: Actions → آخر run → Artifacts → delivery-apk"

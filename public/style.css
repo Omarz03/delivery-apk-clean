@@ -1,0 +1,561 @@
+/* =========================================================
+   style.css — التنسيقات المخصّصة التي لا تغطيها Tailwind
+   (Tailwind يتولى غالبية التخطيط والمسافات والألوان)
+   ========================================================= */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-feature-settings: "tnum" 1;
+}
+
+/* رقم الهوية والأرقام تُعرض دائماً بخط أحادي المسافة لتسهيل المقارنة البصرية */
+.font-mono,
+td[data-numeric="true"] {
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------- شارة "الختم" (Signature element) --------------------
+     عنصر بصري مميز يستلهم من فكرة "ختم الاستلام" الميداني، ويُستخدم
+     كأيقونة تعريفية للتطبيق بدل شعار تقليدي. */
+.stamp-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: 2px dashed rgba(244, 245, 241, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-8deg);
+}
+.stamp-mark span {
+  font-family: "Tajawal", sans-serif;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.stamp-mark--ghost {
+  width: 64px;
+  height: 64px;
+  border-color: rgba(26, 33, 30, 0.15);
+}
+.stamp-mark--ghost span {
+  font-size: 18px;
+  color: rgba(26, 33, 30, 0.2);
+}
+
+/* شارة الحالة: دائرة ملوّنة فقط بدون نص — تتطابق في الحجم مع أيقونة القفل
+     حتى لا يتغيّر عرض العمود الأول أبداً بين الحالات المختلفة. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: default;
+  position: relative;
+}
+.status-badge--delivered {
+  background: rgba(47, 133, 90, 0.12);
+  color: #2f855a;
+}
+.status-badge--pending {
+  background: rgba(156, 66, 33, 0.08);
+  color: rgba(26, 33, 30, 0.3);
+}
+/* نقطة ملوّنة داخل الشارة */
+.status-badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+/* tooltip مشابه للقفل: اسم الحالة عند الهوفر */
+.status-badge::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #1f2e2a;
+  color: #f4f5f1;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 8px;
+  z-index: 50;
+  pointer-events: none;
+  font-family: "Cairo", sans-serif;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.status-badge:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* -------------------- صفوف الجدول -------------------- */
+table {
+  min-width: 700px;
+}
+#tableBody tr {
+  border-top: 1px solid #edece6;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+#tableBody tr:hover {
+  background-color: #f9f8f4;
+}
+#tableBody td {
+  padding: 12px 14px;
+  vertical-align: middle;
+}
+#tableHead th {
+  padding: 11px 14px;
+  text-align: right;
+}
+
+/* عمود الحالة: عرض ثابت ضيق يتّسع فقط بمقدار أيقونة صغيرة — الجدول يستخدم
+     table-fixed لذا هذا العرض محترم بالكامل ولا يتغيّر أبداً سواء الصف عادي
+     أو مقفول. النص الكامل لاسم الجهاز يظهر فقط في tooltip (لابتوب) أو toast
+     (موبايل) ولا يُكتب داخل الخلية أبداً → صفر layout shift. */
+#tableHead th:first-child,
+#tableHead th:nth-child(2),
+#tableBody td:first-child,
+#tableBody td:nth-child(2) {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  text-align: center;
+  padding-right: 4px;
+  padding-left: 4px;
+}
+
+/* -------------------- النافذة الجانبية (Drawer) -------------------- */
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0; /* في RTL تنزلق النافذة من الجهة اليسرى */
+  width: min(420px, 100vw);
+  background: #ffffff;
+  box-shadow: 8px 0 30px rgba(26, 33, 30, 0.12);
+  transform: translateX(-100%);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.open {
+  transform: translateX(0);
+}
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 33, 30, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+  z-index: 40;
+}
+.drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* -------------------- لوحة الجلسة (استيراد + مزامنة) -------------------- */
+.session-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0; /* تنزلق من الجهة اليمنى، عكس نافذة تعديل المستفيد */
+  width: min(440px, 100vw);
+  background: #ffffff;
+  box-shadow: -8px 0 30px rgba(26, 33, 30, 0.12);
+  transform: translateX(100%);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+}
+.session-panel.open {
+  transform: translateX(0);
+}
+
+.drawer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 0;
+  border-bottom: 1px solid #f1f0ea;
+}
+.drawer-field span.label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(26, 33, 30, 0.45);
+}
+.drawer-field span.value {
+  font-size: 14px;
+  color: #1a211e;
+  word-break: break-word;
+}
+
+/* -------------------- مفتاح تبديل حالة الاستلام -------------------- */
+.status-toggle {
+  width: 46px;
+  height: 26px;
+  border-radius: 9999px;
+  background: #e3e1d8;
+  position: relative;
+  transition: background-color 180ms ease;
+  flex-shrink: 0;
+}
+.status-toggle[data-checked="true"] {
+  background: #2f855a;
+}
+.status-toggle__knob {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.status-toggle[data-checked="true"] .status-toggle__knob {
+  transform: translateX(-20px);
+}
+
+/* -------------------- شريط التمرير -------------------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #dad9d0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* -------------------- إتاحة الوصول -------------------- */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #b5561f;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer-overlay,
+  .status-toggle,
+  .status-toggle__knob,
+  #tableBody tr {
+    transition: none !important;
+  }
+}
+
+/* -------------------- إشعارات منبثقة (Toasts) -------------------- */
+.toast {
+  background: #1f2e2a;
+  color: #f4f5f1;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(26, 33, 30, 0.22);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  pointer-events: auto;
+  max-width: 90vw;
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast--success {
+  background: #2f855a;
+}
+.toast--error {
+  background: #9c4221;
+}
+.toast--info {
+  background: #2c4038;
+}
+
+/* -------------------- صفوف مقفلة (Record Locking) -------------------- */
+#tableBody tr.row-locked {
+  cursor: not-allowed;
+  background: repeating-linear-gradient(
+    45deg,
+    #f7f6f2,
+    #f7f6f2 10px,
+    #efede6 10px,
+    #efede6 20px
+  );
+}
+#tableBody tr.row-locked:hover {
+  background: repeating-linear-gradient(
+    45deg,
+    #f7f6f2,
+    #f7f6f2 10px,
+    #efede6 10px,
+    #efede6 20px
+  );
+}
+/* أيقونة قفل ثابتة الحجم — لا نص بالخلية إطلاقاً، لا layout shift */
+.lock-icon-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(156, 66, 33, 0.1);
+  color: #9c4221;
+  cursor: help;
+  position: relative;
+}
+/* tooltip يظهر عند الهوفر على اللابتوب */
+.lock-icon-cell::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #1f2e2a;
+  color: #f4f5f1;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 8px;
+  z-index: 50;
+  pointer-events: none;
+  font-family: "Cairo", sans-serif;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.lock-icon-cell:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* شارة الحالة تبقى بنفس حجمها المضغوط — أيقونة دائرة صغيرة بدون نص */
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* -------------------- عنصر جهاز داخل لوحة الأجهزة المتصلة -------------------- */
+.device-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid #dad9d0;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.device-item .device-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #2f855a;
+  flex-shrink: 0;
+}
+.device-item .device-ip {
+  font-family: "IBM Plex Mono", monospace;
+  color: rgba(26, 33, 30, 0.55);
+  font-size: 12px;
+}
+.device-item--self {
+  border-color: #b5561f;
+  background: rgba(181, 86, 31, 0.05);
+}
+
+/* ==================== نافذة QR للجلسة (إنشاء / انضمام) ==================== */
+.session-qr-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.session-qr-modal.open {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+@media (min-width: 600px) {
+  .session-qr-modal {
+    align-items: center;
+    padding: 16px;
+    transform: scale(0.95);
+    opacity: 0;
+    transition: transform 220ms ease, opacity 220ms ease;
+  }
+  .session-qr-modal.open {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.session-modal-inner {
+  background: #fff;
+  width: 100%;
+  max-width: 460px;
+  border-radius: 24px 24px 0 0;
+  max-height: 92vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 600px) {
+  .session-modal-inner {
+    border-radius: 20px;
+    max-height: 88vh;
+  }
+}
+.session-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #DAD9D0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.session-modal-title {
+  font-family: 'Tajawal', sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  color: #1F2E2A;
+}
+.session-modal-close {
+  color: rgba(26,33,30,0.45);
+  padding: 4px;
+  border-radius: 8px;
+  transition: color 120ms;
+}
+.session-modal-close:hover { color: #1A211E; }
+.session-modal-body { padding: 20px; }
+
+.session-step { display: flex; flex-direction: column; align-items: center; }
+.session-step.hidden { display: none; }
+.step-label {
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(26,33,30,0.55);
+  margin-bottom: 6px;
+  text-align: center;
+}
+.step-desc {
+  font-size: 13px;
+  color: rgba(26,33,30,0.6);
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.step-hint {
+  font-size: 12px;
+  color: rgba(26,33,30,0.4);
+  margin-top: 12px;
+  text-align: center;
+}
+.qr-container {
+  background: #F4F5F1;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+.qr-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #DAD9D0;
+  border-top-color: #1F2E2A;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.scan-container {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  min-height: 240px;
+}
+.scan-container video { width: 100%; display: block; }
+
+.success-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(47,133,90,0.12);
+  color: #2F855A;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.text-delivered { color: #2F855A; }
+
+.btn-primary {
+  background: #B5561F;
+  color: #fff;
+  font-family: 'Cairo', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 150ms;
+  cursor: pointer;
+}
+.btn-primary:hover { background: #D9824C; }
+.btn-secondary {
+  background: transparent;
+  color: rgba(26,33,30,0.6);
+  font-family: 'Cairo', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 11px 20px;
+  border-radius: 14px;
+  border: 1px solid #DAD9D0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms;
+  cursor: pointer;
+}
+.btn-secondary:hover { background: #F4F5F1; }

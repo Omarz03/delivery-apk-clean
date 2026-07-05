@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>نواة التسليم الميداني</title>
+  <meta name="description" content="نظام لإدارة عمليات التسليم الميداني — رفع بيانات المستفيدين، تحديث حالة الاستلام، وتصدير النتائج." />
+  <meta name="theme-color" content="#1F2E2A" />
+
+  <!-- PWA: ملف الوصف والأيقونة -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="نواة التسليم" />
+
+  <!-- خطوط عربية: Tajawal للعناوين، Cairo للنصوص، IBM Plex Mono للأرقام والمعرّفات -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800&family=Cairo:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#F4F5F1',
+            pine: '#1F2E2A',
+            pineLight: '#2C4038',
+            clay: '#B5561F',
+            clayLight: '#D9824C',
+            delivered: '#2F855A',
+            pending: '#9C4221',
+            ink: '#1A211E',
+            line: '#DAD9D0',
+          },
+          fontFamily: {
+            display: ['Tajawal', 'sans-serif'],
+            body: ['Cairo', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- SheetJS: قراءة وكتابة ملفات إكسل داخل المتصفح -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- QRCode.js: توليد QR Code (للمضيف) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- html5-qrcode: مسح QR عبر الكاميرا (للتابع) — يعمل على أندرويد وiOS -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- Capacitor: Bridge للوصول لمزايا الجهاز الأصلية (فقط داخل APK) -->
+  <script>
+    // يتم تحميل Capacitor فقط عند التشغيل كتطبيق أصلي
+    if (typeof window !== 'undefined' && !window.Capacitor) {
+      window.Capacitor = { getPlatform: () => 'web', Plugins: { App: { openUrl: () => Promise.resolve() } } };
+    }
+  </script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-paper text-ink font-body min-h-screen flex flex-col">
+
+  <!-- ===================== الشريط العلوي + شريط الإحصائيات (يبقيان ثابتين أعلى الشاشة) ===================== -->
+  <div class="sticky top-0 z-30 shadow-sm">
+    <header class="bg-pine text-paper">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="stamp-mark shrink-0" aria-hidden="true">
+            <span>تم</span>
+          </div>
+          <div class="leading-tight">
+            <h1 class="font-display font-extrabold text-lg sm:text-xl tracking-tight">نواة التسليم الميداني</h1>
+            <p class="text-paper/60 text-[11px] sm:text-xs font-medium">وحدة إدارة بيانات المستفيدين</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+          <!-- مؤشر حالة P2P -->
+          <span id="p2pStatusBar" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-pineLight/70 font-medium">
+            <span id="p2pStatusDot" class="w-2 h-2 rounded-full bg-ink/25"></span>
+            <span id="p2pStatusLabel">غير متصل</span>
+          </span>
+          <!-- زر الأجهزة -->
+          <button id="devicesPanelToggle" class="relative inline-flex items-center gap-2 bg-pineLight/70 hover:bg-pineLight transition-colors px-3 py-2 rounded-xl font-semibold" title="الأجهزة المتصلة">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="10" rx="1.5"/><path d="M6 18h6M9 14v4"/><rect x="17" y="9" width="5" height="9" rx="1"/></svg>
+            <span class="hidden sm:inline">الأجهزة</span>
+            <span id="devicesCountBadge" class="hidden absolute -top-1.5 -left-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-clay text-[10px] font-bold flex items-center justify-center text-white border-2 border-pine">0</span>
+          </button>
+          <!-- زر الجلسة -->
+          <button id="sessionPanelToggle" class="relative inline-flex items-center gap-2 bg-pineLight/70 hover:bg-pineLight transition-colors px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl font-semibold" title="استيراد بيانات ومزامنة الأجهزة">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <span class="hidden sm:inline">الجلسة</span>
+            <span id="sessionStatusDot" class="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-ink/0 border-2 border-pine"></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- شريط إحصائيات التسليم: عداد حي يتحدث فوراً مع أي تغيير حالة -->
+    <div id="counterBar" class="hidden bg-white border-b border-line px-4 sm:px-6 py-2.5">
+      <div class="max-w-6xl mx-auto flex items-center gap-3 sm:gap-4">
+        <p class="font-display font-bold text-sm sm:text-base text-pine whitespace-nowrap">
+          تم تسليم <span id="deliveredCount" class="text-delivered font-mono">0</span> من أصل <span id="totalCount" class="font-mono">0</span>
+        </p>
+        <div class="flex-1 h-2 rounded-full bg-paper overflow-hidden">
+          <div id="progressFill" class="h-full bg-delivered transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <span id="progressPercent" class="text-xs font-mono text-ink/50 whitespace-nowrap shrink-0">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== لوحة الأجهزة المتصلة ===================== -->
+  <div id="devicesPanelOverlay" class="drawer-overlay"></div>
+  <aside id="devicesPanel" class="session-panel" aria-hidden="true">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 class="font-display font-bold text-pine text-base">الأجهزة المتصلة</h3>
+      <button id="devicesPanelClose" class="text-ink/50 hover:text-ink p-1 rounded-lg" aria-label="إغلاق">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto px-5 py-5">
+      <p class="text-sm text-ink/55 mb-4">الأجهزة المتصلة حالياً بخادم المزامنة على نفس شبكة Wi-Fi.</p>
+      <ul id="devicesList" class="flex flex-col gap-2"></ul>
+      <p id="devicesEmptyMsg" class="text-sm text-ink/35 text-center py-10">لا يوجد اتصال بالخادم حالياً.</p>
+    </div>
+  </aside>
+
+  <!-- حاوية الإشعارات المنبثقة (Toasts) -->
+  <div id="toastContainer" class="fixed bottom-4 inset-x-0 flex flex-col items-center gap-2 z-[70] px-4 pointer-events-none"></div>
+
+  <!-- نافذة اختيار عمود المعرّف الفريد عند الاستيراد (تظهر فقط إن تعذّر الاكتشاف التلقائي) -->
+  <div id="identifierModalOverlay" class="drawer-overlay"></div>
+  <div id="identifierModal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
+      <h3 class="font-display font-bold text-pine text-base mb-1.5">تحديد المعرّف الفريد للمستفيد</h3>
+      <p class="text-sm text-ink/60 mb-4">اختر العمود الذي يمثّل رقماً فريداً لكل مستفيد (مثل رقم الهوية). هذا يمنع تكرار البيانات عند المزامنة بين الأجهزة أو عند إعادة استيراد نفس الملف لاحقاً.</p>
+      <div id="identifierColumnsList" class="flex flex-col gap-2 mb-4"></div>
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <button id="identifierConfirmBtn" class="flex-1 bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm py-2.5 rounded-xl">
+          متابعة الاستيراد
+        </button>
+        <button id="identifierSkipBtn" class="px-4 py-2.5 rounded-xl border border-line text-sm font-medium text-ink/60 hover:bg-paper transition-colors whitespace-nowrap">
+          متابعة بدون معرّف
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== لوحة الجلسة: الاستيراد + المزامنة (تُفتح من زر "الجلسة") ===================== -->
+  <div id="sessionPanelOverlay" class="drawer-overlay"></div>
+  <aside id="sessionPanel" class="session-panel" aria-hidden="true">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 class="font-display font-bold text-pine text-base">إدارة الجلسة</h3>
+      <button id="sessionPanelClose" class="text-ink/50 hover:text-ink p-1 rounded-lg" aria-label="إغلاق">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-6">
+      <!-- قسم الاستيراد -->
+      <section id="importSection">
+        <h2 class="font-display font-bold text-base text-pine">استيراد بيانات المستفيدين</h2>
+        <p class="text-sm text-ink/60 mt-1">ارفع ملف Excel (.xlsx / .xls) لبدء جلسة تسليم جديدة. تُحفظ البيانات محلياً على هذا الجهاز ولا تُفقد عند إغلاق المتصفح.</p>
+
+        <div class="flex flex-wrap items-center gap-2 mt-4">
+          <label for="fileInput" class="cursor-pointer inline-flex items-center gap-2 bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm px-4 py-2.5 rounded-xl">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
+            رفع ملف Excel
+          </label>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden" />
+          <button id="resetBtn" class="hidden text-sm font-medium text-pending/80 hover:text-pending px-3 py-2.5 rounded-xl border border-line hover:border-pending/40 transition-colors">
+            بدء من جديد
+          </button>
+        </div>
+        <p id="importStatus" class="text-xs mt-3 font-medium"></p>
+      </section>
+
+      <hr class="border-line" />
+
+      <!-- قسم الاتصال بين الأجهزة — P2P عبر QR بدون خادم -->
+      <section id="syncSection">
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <h2 class="font-display font-bold text-base text-pine">ربط الأجهزة</h2>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-paper text-xs font-semibold text-ink/60 shrink-0">
+            <span id="syncDot" class="w-2 h-2 rounded-full bg-ink/25"></span>
+            <span id="syncLabel">غير متصل</span>
+          </span>
+        </div>
+        <p class="text-sm text-ink/60">اربط جهازين مباشرة عبر كود QR بدون إنترنت ولا خادم.</p>
+
+        <!-- زر الهوت سبوت -->
+        <button onclick="openHotspotSettings()" class="mt-4 w-full flex items-center gap-3 border border-line rounded-xl px-4 py-3 hover:bg-paper transition-colors text-right">
+          <span class="w-9 h-9 rounded-xl bg-pine/10 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F2E2A" stroke-width="2.2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+          </span>
+          <span class="flex-1">
+            <span class="block text-sm font-semibold text-ink">فعّل الهوت سبوت</span>
+            <span class="block text-xs text-ink/50">الخطوة الأولى — يفتح إعدادات الهوت سبوت مباشرة</span>
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="text-ink/30 rotate-180"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+
+        <!-- زر إنشاء جلسة (المضيف) -->
+        <button onclick="startHostSession()" class="mt-2.5 w-full flex items-center gap-3 border-2 border-clay rounded-xl px-4 py-3 hover:bg-clay/5 transition-colors text-right">
+          <span class="w-9 h-9 rounded-xl bg-clay/10 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B5561F" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+          <span class="flex-1">
+            <span class="block text-sm font-bold text-clay">إنشاء جلسة</span>
+            <span class="block text-xs text-ink/50">هذا الجهاز هو المضيف — يولّد QR للآخرين</span>
+          </span>
+        </button>
+
+        <!-- زر الانضمام (التابع) -->
+        <button onclick="startPeerSession()" class="mt-2 w-full flex items-center gap-3 border border-line rounded-xl px-4 py-3 hover:bg-paper transition-colors text-right">
+          <span class="w-9 h-9 rounded-xl bg-ink/5 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A211E" stroke-width="2.2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+          </span>
+          <span class="flex-1">
+            <span class="block text-sm font-semibold text-ink">الانضمام لجلسة</span>
+            <span class="block text-xs text-ink/50">امسح QR المضيف للانضمام</span>
+          </span>
+        </button>
+
+        <!-- قطع الاتصال — يظهر فقط عند الاتصال -->
+        <button id="p2pDisconnectBtn" class="hidden mt-2 w-full text-sm font-medium text-pending/80 hover:text-pending py-2 rounded-xl border border-line hover:border-pending/40 transition-colors"
+          onclick="window.deliveryP2P.disconnect(); document.getElementById('p2pDisconnectBtn').classList.add('hidden');">
+          قطع الاتصال
+        </button>
+
+        <p id="syncMessage" class="text-xs mt-3 font-medium text-ink/45"></p>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ===================== نافذة QR (تُفتح من أزرار إنشاء/انضمام الجلسة) ===================== -->
+  <div id="sessionModalOverlay" class="drawer-overlay" onclick="closeModal()"></div>
+  <div id="sessionModal" class="session-qr-modal"></div>
+
+  <!-- ===================== المحتوى الرئيسي ===================== -->
+  <main class="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+
+    <!-- حالة فارغة -->
+    <section id="emptyState" class="flex-1 flex flex-col items-center justify-center text-center py-16 border border-dashed border-line rounded-2xl bg-white/40">
+      <div class="stamp-mark stamp-mark--ghost mb-4" aria-hidden="true"><span>تم</span></div>
+      <p class="font-display font-bold text-pine text-lg">لا توجد بيانات بعد</p>
+      <p class="text-ink/50 text-sm mt-1.5 max-w-xs">ابدأ جلسة تسليم جديدة برفع ملف Excel يحتوي على قائمة المستفيدين.</p>
+      <button id="emptyStateStartBtn" class="mt-5 inline-flex items-center gap-2 bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm px-5 py-2.5 rounded-xl">
+        بدء جلسة تسليم
+      </button>
+    </section>
+
+    <!-- قسم البيانات (يظهر بعد الاستيراد) -->
+    <section id="dataSection" class="hidden flex-1 flex flex-col gap-4">
+
+      <!-- شريط البحث: بحث عام + بحث برقم الصف + زر مسح -->
+      <div class="flex items-center gap-2">
+        <!-- البحث العام -->
+        <div class="relative flex-1">
+          <svg class="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink/35" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="بحث باسم أو هوية..."
+            class="w-full bg-white border border-line rounded-xl py-2.5 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay transition-shadow"
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- بحث برقم الصف -->
+        <button id="rowSearchToggle" class="shrink-0 h-10 px-3 bg-white border border-line rounded-xl text-ink/55 hover:text-ink hover:border-clay/60 transition-colors text-xs font-bold font-mono" title="بحث برقم الصف">
+          #
+        </button>
+        <div id="rowSearchWrapper" class="hidden w-24 shrink-0">
+          <input
+            id="rowSearchInput"
+            type="number"
+            min="1"
+            placeholder="رقم..."
+            class="w-full bg-white border border-line rounded-xl py-2.5 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay transition-shadow"
+            dir="ltr"
+          />
+        </div>
+
+        <!-- مسح كل الحقول -->
+        <button id="clearSearchBtn" class="hidden shrink-0 h-10 w-10 flex items-center justify-center bg-white border border-line rounded-xl text-ink/40 hover:text-pending hover:border-pending/40 transition-colors" title="مسح البحث">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- جدول البيانات -->
+      <div class="bg-white border border-line rounded-2xl overflow-hidden flex-1 flex flex-col">
+        <div class="overflow-auto max-h-[65vh]">
+          <table class="w-full text-sm text-right border-collapse table-fixed">
+            <thead id="tableHead" class="bg-paper sticky top-0 z-10 text-ink/60 font-semibold text-xs uppercase tracking-wide">
+              <!-- تُبنى رؤوس الأعمدة ديناميكياً في script.js -->
+            </thead>
+            <tbody id="tableBody">
+              <!-- تُبنى الصفوف ديناميكياً في script.js -->
+            </tbody>
+          </table>
+        </div>
+        <p id="noResults" class="hidden text-center text-ink/40 text-sm py-10">لا توجد نتائج مطابقة للبحث.</p>
+      </div>
+
+      <!-- زر التصدير -->
+      <div class="flex justify-end">
+        <button id="exportBtn" class="inline-flex items-center gap-2 bg-pine hover:bg-pineLight transition-colors text-white font-semibold text-sm px-5 py-3 rounded-xl">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" transform="rotate(180 12 12)"/></svg>
+          تصدير كملف Excel
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="text-center text-[11px] text-ink/35 py-4 font-medium">
+    النواة (Core Module) — الإصدار 0.1 — يعمل بالكامل بدون اتصال بالإنترنت بعد التحميل الأول
+  </footer>
+
+  <!-- ===================== النافذة الجانبية (Drawer) ===================== -->
+  <div id="drawerOverlay" class="drawer-overlay"></div>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 class="font-display font-bold text-pine text-base">تفاصيل المستفيد</h3>
+      <button id="drawerClose" class="text-ink/50 hover:text-ink p-1 rounded-lg" aria-label="إغلاق">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 py-4">
+      <!-- بيانات الاستيراد الأصلية (للقراءة فقط) -->
+      <div id="drawerOriginalData" class="grid grid-cols-1 gap-3 mb-6 text-sm">
+        <!-- يُبنى ديناميكياً -->
+      </div>
+
+      <hr class="border-line mb-5" />
+
+      <!-- الحقول القابلة للتعديل -->
+      <div class="flex flex-col gap-4">
+        <div>
+          <span class="block text-xs font-semibold text-ink/55 mb-2">حالة الاستلام</span>
+          <div class="flex items-center gap-3">
+            <button id="statusToggle" type="button" class="status-toggle" data-checked="false">
+              <span class="status-toggle__knob"></span>
+            </button>
+            <span id="statusLabel" class="text-sm font-semibold text-pending">لم يتم الاستلام</span>
+          </div>
+        </div>
+
+        <label class="block">
+          <span class="block text-xs font-semibold text-ink/55 mb-1.5">اسم المستلم</span>
+          <input id="receiverInput" type="text" placeholder="اسم الشخص الذي استلم المساعدة"
+            class="w-full border border-line rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay" />
+        </label>
+
+        <label class="block">
+          <span class="block text-xs font-semibold text-ink/55 mb-1.5">ملاحظات</span>
+          <textarea id="notesInput" rows="4" placeholder="أي ملاحظات ميدانية إضافية..."
+            class="w-full border border-line rounded-lg py-2.5 px-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay"></textarea>
+        </label>
+      </div>
+    </div>
+
+    <div class="px-5 py-4 border-t border-line flex gap-2.5">
+      <button id="drawerSave" class="flex-1 bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm py-3 rounded-xl">
+        حفظ التعديلات
+      </button>
+      <button id="drawerCancel" class="px-4 py-3 rounded-xl border border-line text-sm font-medium text-ink/60 hover:bg-paper transition-colors">
+        إلغاء
+      </button>
+    </div>
+  </aside>
+
+  <script src="script.js"></script>
+  <script src="webrtc-p2p.js"></script>
+  <script src="session-qr.js"></script>
+  <script src="sync-bridge.js"></script>
+  <script>
+    // عرض زر "قطع الاتصال" تلقائياً عند اكتمال الاتصال P2P
+    window.deliveryP2P.addEventListener('channel-open', () => {
+      document.getElementById('p2pDisconnectBtn')?.classList.remove('hidden');
+      document.getElementById('syncDot').className = 'w-2 h-2 rounded-full bg-delivered';
+      document.getElementById('syncLabel').textContent = 'جلسة نشطة';
+    });
+    window.deliveryP2P.addEventListener('channel-closed', () => {
+      document.getElementById('p2pDisconnectBtn')?.classList.add('hidden');
+      document.getElementById('syncDot').className = 'w-2 h-2 rounded-full bg-ink/25';
+      document.getElementById('syncLabel').textContent = 'غير متصل';
+    });
+    window.deliveryP2P.addEventListener('disconnected', () => {
+      document.getElementById('p2pDisconnectBtn')?.classList.add('hidden');
+    });
+  </script>
+</body>
+</html>

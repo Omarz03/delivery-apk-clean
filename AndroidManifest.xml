@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest.xml — صلاحيات تطبيق نواة التسليم الميداني
+  ============================================================
+  بعد تشغيل "npx cap add android"، انسخ هذا الملف إلى:
+  android/app/src/main/AndroidManifest.xml
+  (أو ادمج الصلاحيات مع الملف الموجود يدوياً)
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- الكاميرا: لمسح QR Code عند الانضمام لجلسة -->
+  <uses-permission android:name="android.permission.CAMERA" />
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
+  <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+  <!-- الشبكة: للاتصال WebRTC والـ STUN discovery -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+  <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+  <!-- الاهتزاز: للـ haptic feedback عند الاتصال الناجح -->
+  <uses-permission android:name="android.permission.VIBRATE" />
+
+  <!-- Wake Lock: يمنع الشاشة من الإطفاء أثناء عرض QR Code للمسح -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application
+    android:allowBackup="true"
+    android:icon="@mipmap/ic_launcher"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:label="@string/app_name"
+    android:supportsRtl="true"
+    android:theme="@style/AppTheme"
+    android:usesCleartextTraffic="false">
+
+    <activity
+      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+      android:exported="true"
+      android:hardwareAccelerated="true"
+      android:launchMode="singleTask"
+      android:name=".MainActivity"
+      android:windowSoftInputMode="adjustResize">
+
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+
+    </activity>
+
+    <!-- FileProvider لمشاركة الملفات المُصدَّرة (ملفات Excel) -->
+    <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/file_paths" />
+    </provider>
+
+  </application>
+</manifest>

@@ -1,0 +1,34 @@
+{
+  "appId": "com.delivery.core",
+  "appName": "نواة التسليم",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "allowNavigation": []
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "release-key.jks",
+      "keystoreAlias": "delivery-key"
+    },
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": true
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#1F2E2A",
+      "overlaysWebView": false
+    },
+    "App": {
+      "launchShowDuration": 0
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "delivery-core-apk",
+  "version": "1.0.0",
+  "description": "نواة التسليم الميداني — تطبيق أندرويد",
+  "scripts": {
+    "sync": "npx cap sync",
+    "android": "npx cap open android",
+    "build:apk": "npx cap sync && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/haptics": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

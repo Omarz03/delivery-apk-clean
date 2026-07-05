@@ -1,0 +1,13 @@
+# Android
+android/
+ios/
+node_modules/
+
+# Build outputs
+*.apk
+*.aab
+*.ipa
+
+# OS
+.DS_Store
+Thumbs.db
