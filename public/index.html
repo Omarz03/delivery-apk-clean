@@ -22,40 +22,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800&family=Cairo:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
 
   <!-- Tailwind CSS (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            paper: '#F4F5F1',
-            pine: '#1F2E2A',
-            pineLight: '#2C4038',
-            clay: '#B5561F',
-            clayLight: '#D9824C',
-            delivered: '#2F855A',
-            pending: '#9C4221',
-            ink: '#1A211E',
-            line: '#DAD9D0',
-          },
-          fontFamily: {
-            display: ['Tajawal', 'sans-serif'],
-            body: ['Cairo', 'sans-serif'],
-            mono: ['"IBM Plex Mono"', 'monospace'],
-          },
-        },
-      },
-    };
-  </script>
+  <link rel="stylesheet" href="libs/tailwind.min.css" />
 
   <!-- SheetJS: قراءة وكتابة ملفات إكسل داخل المتصفح -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="libs/xlsx.full.min.js"></script>
 
   <!-- QRCode.js: توليد QR Code (للمضيف) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="libs/qrcode.min.js"></script>
 
   <!-- html5-qrcode: مسح QR عبر الكاميرا (للتابع) — يعمل على أندرويد وiOS -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="libs/html5-qrcode.min.js"></script>
 
   <!-- Capacitor: Bridge للوصول لمزايا الجهاز الأصلية (فقط داخل APK) -->
   <script>
