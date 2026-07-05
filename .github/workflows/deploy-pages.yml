@@ -1,0 +1,68 @@
+name: نشر على GitHub Pages (offline كامل)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: تحميل المكتبات محلياً
+        run: |
+          mkdir -p public/libs
+          
+          # Tailwind CSS
+          curl -sL "https://unpkg.com/tailwindcss@3.4.1/dist/tailwind.min.css" \
+            -o public/libs/tailwind.min.css
+          echo "Tailwind: $(wc -c < public/libs/tailwind.min.css) bytes"
+          
+          # SheetJS
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" \
+            -o public/libs/xlsx.full.min.js
+          echo "xlsx: $(wc -c < public/libs/xlsx.full.min.js) bytes"
+          
+          # QRCode
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" \
+            -o public/libs/qrcode.min.js
+          echo "qrcode: $(wc -c < public/libs/qrcode.min.js) bytes"
+          
+          # html5-qrcode
+          curl -sL "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" \
+            -o public/libs/html5-qrcode.min.js
+          echo "html5-qrcode: $(wc -c < public/libs/html5-qrcode.min.js) bytes"
+
+      - name: تحديث index.html ليستخدم المكتبات المحلية
+        run: |
+          cd public
+          
+          # استبدال Tailwind CDN script بـ CSS محلي
+          sed -i 's|<script src="https://cdn.tailwindcss.com"></script>|<link rel="stylesheet" href="libs/tailwind.min.css" />|g' index.html
+          
+          # استبدال باقي المكتبات
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js|libs/xlsx.full.min.js|g' index.html
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js|libs/qrcode.min.js|g' index.html
+          sed -i 's|https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js|libs/html5-qrcode.min.js|g' index.html
+          
+          # إزالة إعداد Tailwind JS (مش محتاجه مع CSS)
+          sed -i '/<script>[\s]*tailwind\.config/,/<\/script>/d' index.html
+          
+          echo "=== CDN references remaining ==="
+          grep -n "cdn\|unpkg\|cdnjs" index.html || echo "✅ Zero CDN references"
+
+      - name: نشر على GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages
+          force_orphan: true
