@@ -99,9 +99,16 @@ class DeliveryP2P extends EventTarget {
     this._createPeerConnection();
 
     // المضيف يفتح القناة — التابع يستقبلها عبر ondatachannel
+    // مهم جداً: بلا maxRetransmits ولا maxPacketLifeTime، تكون القناة "موثوقة
+    // بالكامل" (reliable, ordered) — أي قطعة بيانات لازم توصل مهما تكرر
+    // إعادة الإرسال. كنا سابقاً نستخدم maxRetransmits: 10 وهذا كان يجعل
+    // القناة "موثوقية جزئية" (partial reliability): لو فُقدت قطعة بيانات على
+    // شبكة هوت سبوت مزدحمة/ضعيفة ولم تصل خلال 10 محاولات، تُهمَل نهائياً
+    // بصمت — وبما أن ملف الإكسل الكبير يُقسَّم لعشرات القطع (chunks)، فقدان
+    // قطعة واحدة فقط كان يعلّق عملية التجميع للأبد بلا أي خطأ ظاهر — وهذا
+    // بالضبط سبب عدم وصول بيانات الإكسل للأجهزة المتصلة.
     this.dc = this.pc.createDataChannel('delivery', {
       ordered: true,
-      maxRetransmits: 10,
     });
     this._setupDataChannel(this.dc);
 
@@ -247,15 +254,31 @@ class DeliveryP2P extends EventTarget {
      داخلي: تجميع chunks رسائل كبيرة
      ----------------------------------------------------------------------- */
   _chunkBuffers = new Map();
+  _chunkTimeouts = new Map();
 
   _handleChunk({ chunkId, index, total, data }) {
     if (!this._chunkBuffers.has(chunkId)) {
       this._chunkBuffers.set(chunkId, new Array(total).fill(null));
+
+      // مهلة أمان: لو ما اكتملت كل القطع خلال 20 ثانية (مثلاً بسبب انقطاع
+      // مفاجئ بمنتصف النقل)، نُبلّغ بدل ما تبقى العملية معلّقة بصمت للأبد.
+      const timeoutId = setTimeout(() => {
+        if (this._chunkBuffers.has(chunkId)) {
+          const buffer = this._chunkBuffers.get(chunkId);
+          const received = buffer.filter((c) => c !== null).length;
+          this._chunkBuffers.delete(chunkId);
+          this._chunkTimeouts.delete(chunkId);
+          this._dispatch('transfer-incomplete', { received, total: buffer.length });
+        }
+      }, 20000);
+      this._chunkTimeouts.set(chunkId, timeoutId);
     }
     const buffer = this._chunkBuffers.get(chunkId);
     buffer[index] = data;
 
     if (buffer.every((c) => c !== null)) {
+      clearTimeout(this._chunkTimeouts.get(chunkId));
+      this._chunkTimeouts.delete(chunkId);
       this._chunkBuffers.delete(chunkId);
       try {
         const full = JSON.parse(buffer.join(''));
