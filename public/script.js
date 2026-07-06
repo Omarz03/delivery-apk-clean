@@ -932,6 +932,56 @@ function broadcastUnlockRecord(syncId) {
 }
 
 /**
+ * تطبيق قفل وارد من جهاز آخر على سجل معيّن (تستدعيها sync-bridge.js عند
+ * استقبال رسالة قفل عبر WebRTC P2P، بالشكل: applyLock(syncId, ownerId, ownerName)).
+ * نخزّن معلومات الجهاز القافل، ونضبط مؤقّت احتياطي 30 ثانية يفكّ القفل تلقائياً
+ * إن لم يصل إعلام فكّ قفل صريح (مثلاً بسبب انقطاع اتصال الجهاز الآخر).
+ * @param {string} syncId
+ * @param {string} [deviceId]
+ * @param {string} [deviceName]
+ */
+function applyLock(syncId, deviceId, deviceName) {
+  if (!syncId) return;
+
+  // إن كان هناك مؤقّت سابق لنفس السجل، نلغيه قبل ضبط مؤقّت جديد
+  if (lockExpiryTimers.has(syncId)) {
+    clearTimeout(lockExpiryTimers.get(syncId));
+  }
+
+  lockedRecords.set(syncId, {
+    deviceId: deviceId || null,
+    deviceName: deviceName || 'جهاز آخر',
+    expiresAt: Date.now() + 30000,
+  });
+
+  const timerId = setTimeout(() => {
+    lockedRecords.delete(syncId);
+    lockExpiryTimers.delete(syncId);
+    renderTableRows();
+  }, 30000);
+  lockExpiryTimers.set(syncId, timerId);
+
+  renderTableRows();
+}
+
+/**
+ * فكّ قفل سجل بعد استقبال إعلام فكّ قفل صريح من الجهاز الذي كان يعدّله
+ * (أو بعد إغلاق النافذة الجانبية على ذلك الجهاز).
+ * @param {string} syncId
+ */
+function releaseLock(syncId) {
+  if (!syncId) return;
+
+  lockedRecords.delete(syncId);
+  if (lockExpiryTimers.has(syncId)) {
+    clearTimeout(lockExpiryTimers.get(syncId));
+    lockExpiryTimers.delete(syncId);
+  }
+
+  renderTableRows();
+}
+
+/**
  * دمج سجل وارد من جهاز آخر مع البيانات المحلية:
  * - إن لم يكن موجوداً محلياً (syncId جديد) → يُضاف كسجل جديد.
  * - إن كان موجوداً والوارد أحدث (__updatedAt أكبر) → يُحدَّث محلياً.
