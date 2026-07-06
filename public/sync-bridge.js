@@ -35,6 +35,16 @@ p2p.addEventListener('disconnected', () => {
   updateP2PStatusUI(false);
 });
 
+p2p.addEventListener('transfer-incomplete', (event) => {
+  const { received, total } = event.detail;
+  console.warn(`نقل بيانات غير مكتمل: وصلت ${received} من ${total} قطعة`);
+  window.showToast?.(
+    `تعذّر إكمال استقبال البيانات (${received}/${total}) — الرجاء إعادة المحاولة`,
+    'error',
+    4000
+  );
+});
+
 /* -----------------------------------------------------------------------
    معالجة الرسائل الواردة — نفس نوع الرسائل القديمة لكن بدون خادم
    ----------------------------------------------------------------------- */
