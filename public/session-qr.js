@@ -77,6 +77,134 @@ function stopQRScan() {
 }
 
 /* -----------------------------------------------------------------------
+   QR متحرك (Animated QR) — لتبسيط الرمز بصرياً
+   -------------------------------------------------------------------------
+   بدل رمز واحد كثيف يحمل كل بيانات WebRTC دفعة واحدة، نقسّم النص إلى قطع
+   صغيرة ونعرضها كسلسلة رموز بسيطة تتبدّل تلقائياً وبشكل دائري (تتكرر من
+   جديد بعد آخر قطعة). كل قطعة معها رقمها الترتيبي، فترتيب استقبالها غير
+   مهم، وأي قطعة تفوت الكاميرا رح ترجع تظهر بالدورة التالية تلقائياً —
+   بلا أي تدخل من المستخدم ولا حاجة لإعادة أي شيء يدوياً.
+   ----------------------------------------------------------------------- */
+
+/**
+ * عرض نص طويل كسلسلة رموز QR بسيطة تتبدّل تلقائياً.
+ * @param {string} containerId
+ * @param {string} payloadStr النص الكامل (بعد الضغط) المطلوب نقله
+ * @param {{ chunkSize?: number, intervalMs?: number }} [options]
+ * @returns {{ stop: () => void, totalChunks: number }}
+ */
+function startAnimatedQR(containerId, payloadStr, options = {}) {
+  const chunkSize = options.chunkSize || 180;
+  const intervalMs = options.intervalMs || 800;
+  const transferId = Math.random().toString(36).slice(2, 8);
+  const totalChunks = Math.max(1, Math.ceil(payloadStr.length / chunkSize));
+
+  const frames = [];
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkData = payloadStr.slice(i * chunkSize, (i + 1) * chunkSize);
+    frames.push(JSON.stringify({ id: transferId, i, n: totalChunks, d: chunkData }));
+  }
+
+  let currentFrame = 0;
+  let stopped = false;
+
+  function renderFrame() {
+    if (stopped) return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+
+    const size = Math.min(window.innerWidth * 0.72, 280);
+    new QRCode(container, {
+      text: frames[currentFrame],
+      width: size,
+      height: size,
+      colorDark: '#1F2E2A',
+      colorLight: '#F4F5F1',
+      // مستوى تصحيح أخف (L) لأن الرمز بيتكرر تلقائياً — لا حاجة لتصحيح
+      // أخطاء مرتفع، وهذا يخفّف الكثافة البصرية للرمز بشكل ملموس.
+      correctLevel: QRCode.CorrectLevel.L,
+    });
+
+    // مؤشر بصري صغير لعدد القطعة الحالية (يساعد أثناء الاختبار الميداني)
+    const badge = document.createElement('div');
+    badge.textContent = `${currentFrame + 1} / ${totalChunks}`;
+    badge.style.cssText = 'margin-top:8px;font-size:12px;opacity:0.6;text-align:center;';
+    container.appendChild(badge);
+
+    currentFrame = (currentFrame + 1) % totalChunks;
+  }
+
+  renderFrame();
+  const timer = setInterval(renderFrame, intervalMs);
+
+  return {
+    stop() {
+      stopped = true;
+      clearInterval(timer);
+    },
+    totalChunks,
+  };
+}
+
+/**
+ * مسح مستمر لسلسلة رموز QR متحركة وتجميعها حتى اكتمال كل القطع.
+ * على عكس startQRScan (يتوقف عند أول رمز)، هذه الدالة تستمر بالمسح وتُعيد
+ * تجميع القطع الواردة (بأي ترتيب) حتى تكتمل كل قطع نفس عملية النقل.
+ * @param {string} videoContainerId
+ * @param {{ onProgress?: (received: number, total: number) => void }} [options]
+ * @returns {Promise<string>} النص الكامل المُعاد تجميعه
+ */
+function startAnimatedQRScan(videoContainerId, options = {}) {
+  const { onProgress } = options;
+
+  return new Promise((resolve, reject) => {
+    if (activeScanner) {
+      activeScanner.stop().catch(() => {});
+      activeScanner = null;
+    }
+
+    activeScanner = new Html5Qrcode(videoContainerId);
+    const config = { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 };
+    const buffers = new Map(); // transferId → مصفوفة القطع
+
+    activeScanner.start(
+      { facingMode: 'environment' },
+      config,
+      (decodedText) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(decodedText);
+        } catch {
+          return; // إطار غير صالح أو منتصف انتقال — نتجاهله ونستمر بالمسح
+        }
+        if (typeof parsed.i !== 'number' || typeof parsed.n !== 'number' || !parsed.id) return;
+
+        if (!buffers.has(parsed.id)) {
+          buffers.set(parsed.id, new Array(parsed.n).fill(null));
+        }
+        const buffer = buffers.get(parsed.id);
+        buffer[parsed.i] = parsed.d;
+
+        const receivedCount = buffer.filter((c) => c !== null).length;
+        onProgress?.(receivedCount, parsed.n);
+
+        if (receivedCount === parsed.n) {
+          const fullText = buffer.join('');
+          activeScanner.stop()
+            .then(() => { activeScanner = null; resolve(fullText); })
+            .catch(() => { activeScanner = null; resolve(fullText); });
+        }
+      },
+      () => {} // أخطاء المسح المؤقتة بين الإطارات — تُتجاهل
+    ).catch((err) => {
+      activeScanner = null;
+      reject(err);
+    });
+  });
+}
+
+/* -----------------------------------------------------------------------
    واجهة المضيف (Host Flow)
    خطوة ١: إنشاء Offer وعرضها كـ QR
    خطوة ٢: مسح Answer من التابع
@@ -97,6 +225,7 @@ async function startHostSession() {
     <div id="hostStep2" class="session-step hidden">
       <p class="step-label">الخطوة ٢ من ٢ — امسح كود التابع</p>
       <div id="hostScanVideo" class="scan-container"></div>
+      <p id="hostScanProgress" class="step-hint">وجّه الكاميرا نحو الكود المتحرك على شاشة التابع...</p>
       <button id="hostCancelScanBtn" class="btn-secondary mt-3 w-full">إلغاء</button>
     </div>
 
@@ -110,10 +239,12 @@ async function startHostSession() {
 
   openModal();
 
+  let offerQRController = null;
+
   try {
     // إنشاء Offer
     const offerJson = await window.deliveryP2P.createOffer();
-    await generateQR('hostOfferQR', offerJson);
+    offerQRController = startAnimatedQR('hostOfferQR', offerJson);
 
     // الخطوة ٢: مسح Answer
     document.getElementById('hostScanAnswerBtn').addEventListener('click', async () => {
@@ -127,11 +258,17 @@ async function startHostSession() {
       });
 
       try {
-        const answerJson = await startQRScan('hostScanVideo');
+        const answerJson = await startAnimatedQRScan('hostScanVideo', {
+          onProgress: (received, total) => {
+            const hint = document.getElementById('hostScanProgress');
+            if (hint) hint.textContent = `تم استقبال ${received} من ${total} — استمر بتوجيه الكاميرا`;
+          },
+        });
         await window.deliveryP2P.receiveAnswer(answerJson);
 
         // انتظار فتح DataChannel
         await waitForChannel();
+        offerQRController?.stop();
 
         document.getElementById('hostStep2').classList.add('hidden');
         document.getElementById('hostConnected').classList.remove('hidden');
@@ -146,6 +283,7 @@ async function startHostSession() {
     });
 
   } catch (err) {
+    offerQRController?.stop();
     closeModal();
     window.showToast('تعذّر إنشاء الجلسة. تأكد أن المتصفح يدعم WebRTC.', 'error');
   }
@@ -161,8 +299,9 @@ async function startPeerSession() {
   modal.innerHTML = buildModalShell('الانضمام لجلسة', `
     <div id="peerStep1" class="session-step">
       <p class="step-label">الخطوة ١ من ٢ — امسح كود المضيف</p>
-      <p class="step-desc">وجّه الكاميرا نحو الكود الظاهر على شاشة الجهاز الرئيسي.</p>
+      <p class="step-desc">وجّه الكاميرا نحو الكود المتحرك الظاهر على شاشة الجهاز الرئيسي.</p>
       <div id="peerScanVideo" class="scan-container"></div>
+      <p id="peerScanProgress" class="step-hint">استمر بتوجيه الكاميرا نحو الكود...</p>
       <button id="peerCancelBtn" class="btn-secondary mt-3 w-full">إلغاء</button>
     </div>
 
@@ -188,19 +327,27 @@ async function startPeerSession() {
     closeModal();
   });
 
+  let answerQRController = null;
+
   try {
     // مسح Offer من المضيف
-    const offerJson = await startQRScan('peerScanVideo');
+    const offerJson = await startAnimatedQRScan('peerScanVideo', {
+      onProgress: (received, total) => {
+        const hint = document.getElementById('peerScanProgress');
+        if (hint) hint.textContent = `تم استقبال ${received} من ${total} — استمر بتوجيه الكاميرا`;
+      },
+    });
 
     document.getElementById('peerStep1').classList.add('hidden');
     document.getElementById('peerStep2').classList.remove('hidden');
 
-    // إنشاء Answer وعرضها كـ QR
+    // إنشاء Answer وعرضها كـ QR متحرك
     const answerJson = await window.deliveryP2P.createAnswer(offerJson);
-    await generateQR('peerAnswerQR', answerJson);
+    answerQRController = startAnimatedQR('peerAnswerQR', answerJson);
 
     // انتظار فتح DataChannel (المضيف يمسح الـ Answer ويكمل الـ Handshake)
     await waitForChannel();
+    answerQRController?.stop();
 
     document.getElementById('peerStep2').classList.add('hidden');
     document.getElementById('peerConnected').classList.remove('hidden');
@@ -209,6 +356,7 @@ async function startPeerSession() {
     window.showToast('تم الاتصال — الجلسة نشطة', 'success');
 
   } catch (err) {
+    answerQRController?.stop();
     stopQRScan();
     closeModal();
     const msg = err?.name === 'NotAllowedError'
