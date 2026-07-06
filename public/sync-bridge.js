@@ -60,9 +60,8 @@ p2p.addEventListener('message', async (event) => {
         const applied = await window.upsertBySyncId?.(record);
         changed = changed || applied;
       }
-      if (payload.columns?.length && (!window.allColumns?.length)) {
-        window.allColumns = payload.columns;
-        await window.setMeta?.('columns', payload.columns);
+      if (payload.columns?.length) {
+        await window.setAllColumnsIfMissing?.(payload.columns);
       }
       if (changed) window.renderApp?.();
       // نرد بنسختنا المحدّثة
@@ -86,9 +85,8 @@ p2p.addEventListener('message', async (event) => {
         const applied = await window.upsertBySyncId?.(record);
         changed = changed || applied;
       }
-      if (payload.columns?.length && !window.allColumns?.length) {
-        window.allColumns = payload.columns;
-        await window.setMeta?.('columns', payload.columns);
+      if (payload.columns?.length) {
+        await window.setAllColumnsIfMissing?.(payload.columns);
       }
       if (changed || payload.records?.length > 0) window.renderApp?.();
       window.showToast?.(`تمت المزامنة — ${payload.records?.length || 0} سجل`, 'success', 2000);
@@ -103,15 +101,12 @@ p2p.addEventListener('message', async (event) => {
 
     case 'dataset_replaced': {
       if (!payload?.records) break;
-      const confirmed = window.allRecords?.length
-        ? window.confirm('جهاز آخر استورد ملف بيانات جديداً. هل تريد استبدال بياناتك؟')
-        : true;
-      if (confirmed) {
-        await window.replaceAllRecords?.(payload.records, payload.columns);
-        window.allColumns = payload.columns || [];
-        window.allRecords = await window.getAllRecords?.() || [];
-        window.renderApp?.();
-      }
+      // نستخدم applyIncomingFullDataset (المعرّفة في script.js) لأنها تحدّث
+      // المتغيرات الداخلية الفعلية مباشرة (وليس نسخاً منفصلة)، وتتولى بنفسها
+      // منطق طلب التأكيد إن وُجدت بيانات محلية مختلفة.
+      await window.applyIncomingFullDataset?.(payload.records, payload.columns, {
+        requireConfirmation: true,
+      });
       break;
     }
 
@@ -129,10 +124,7 @@ p2p.addEventListener('message', async (event) => {
     }
 
     case 'session-reset': {
-      await window.clearAllData?.();
-      window.allRecords = [];
-      window.allColumns = [];
-      window.renderApp?.();
+      await window.resetLocalStateForRemoteReset?.();
       window.showToast?.('بدأ جهاز آخر جلسة جديدة — تم مسح البيانات هنا أيضاً', 'info');
       break;
     }
