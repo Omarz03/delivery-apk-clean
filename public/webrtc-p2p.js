@@ -17,14 +17,69 @@
    ========================================================================= */
 
 const RTC_CONFIG = {
-  // نستخدم فقط STUN servers كـ fallback لاكتشاف العنوان العام — لكن بالشبكة
-  // المحلية الاتصال بيتم مباشرة عبر ICE candidates المحلية (LAN) بدون STUN.
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  // بلا STUN: نحن على شبكة محلية (Wi-Fi/Hotspot) بدون إنترنت، فلا فائدة من
+  // محاولة الاتصال بسيرفر STUN خارجي — هذا كان يسبب فقط انتظاراً بلا طائل.
+  // بهذا الشكل نجمع فقط "host candidates" المحلية، وهي كافية 100% للشبكة المحلية.
+  iceServers: [],
 };
 
 // الحد الأقصى لحجم الرسالة الواحدة عبر DataChannel (Chrome: 256KB، iOS: 64KB)
 // نختار 60KB حداً آمناً يشتغل على الكل، وأي حمولة أكبر تُقسَّم تلقائياً.
 const CHUNK_SIZE = 60 * 1024;
+
+/* -------------------------------------------------------------------------
+   ضغط/فك ضغط بيانات Offer/Answer قبل تحويلها لـ QR
+   -------------------------------------------------------------------------
+   نص SDP طويل ومليان تكرار (خصوصاً مع عدّة ICE candidates)، فضغطه بصيغة
+   gzip قبل التحويل لـ QR يقلّل حجمه بشكل كبير جداً → QR أصغر وأسرع بالقراية.
+   نستخدم CompressionStream/DecompressionStream المدمجتين بالمتصفح (بدون أي
+   مكتبة خارجية أو حاجة لإنترنت)، مع بادئة (GZ:/RAW:) للتوافق مع الأجهزة التي
+   لا تدعم هذه الواجهة (نادر جداً على المتصفحات الحديثة).
+   ------------------------------------------------------------------------- */
+function _bufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function _base64ToBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function compressForQR(str) {
+  if (typeof CompressionStream === 'undefined') return 'RAW:' + str;
+  try {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+    const blob = await new Response(stream).blob();
+    const buffer = await blob.arrayBuffer();
+    return 'GZ:' + _bufferToBase64(buffer);
+  } catch (e) {
+    console.warn('تعذّر ضغط البيانات، سيتم إرسالها بدون ضغط:', e);
+    return 'RAW:' + str;
+  }
+}
+
+async function decompressFromQR(payload) {
+  if (payload.startsWith('RAW:')) return payload.slice(4);
+  if (payload.startsWith('GZ:')) {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('هذا الجهاز/المتصفح لا يدعم فك ضغط البيانات — استخدم متصفحاً أحدث.');
+    }
+    const buffer = _base64ToBuffer(payload.slice(3));
+    const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const blob = await new Response(stream).blob();
+    return await blob.text();
+  }
+  // توافق احتياطي مع أي بيانات قديمة غير معلَّمة بالبادئة
+  return payload;
+}
 
 class DeliveryP2P extends EventTarget {
   constructor() {
@@ -55,7 +110,7 @@ class DeliveryP2P extends EventTarget {
 
     // انتظار اكتمال جمع ICE candidates قبل تحويل الـ Offer لـ QR
     const fullOffer = await this._waitForIceCandidates();
-    return fullOffer; // سلسلة JSON جاهزة للتحويل لـ QR
+    return await compressForQR(fullOffer); // نص مضغوط جاهز للتحويل لـ QR
   }
 
   /* -----------------------------------------------------------------------
@@ -71,14 +126,15 @@ class DeliveryP2P extends EventTarget {
       this._setupDataChannel(this.dc);
     };
 
-    const offer = JSON.parse(offerJson);
+    const offerRaw = await decompressFromQR(offerJson);
+    const offer = JSON.parse(offerRaw);
     await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
 
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
 
     const fullAnswer = await this._waitForIceCandidates();
-    return fullAnswer; // سلسلة JSON جاهزة للتحويل لـ QR
+    return await compressForQR(fullAnswer); // نص مضغوط جاهز للتحويل لـ QR
   }
 
   /* -----------------------------------------------------------------------
@@ -86,7 +142,8 @@ class DeliveryP2P extends EventTarget {
      ----------------------------------------------------------------------- */
   async receiveAnswer(answerJson) {
     if (this.role !== 'host') throw new Error('receiveAnswer فقط للمضيف');
-    const answer = JSON.parse(answerJson);
+    const answerRaw = await decompressFromQR(answerJson);
+    const answer = JSON.parse(answerRaw);
     await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
     // DataChannel سيُفتح تلقائياً وstatus يتغيّر إلى "open"
   }
@@ -215,9 +272,10 @@ class DeliveryP2P extends EventTarget {
   _waitForIceCandidates() {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        // بعض الشبكات بطيئة في ICE — نعطيها 8 ثوانٍ كحد أقصى
+        // بدون STUN، جمع الـ host candidates المحلية سريع جداً — ثانيتان
+        // كحد أقصى كافيتان تماماً (كنا نستنى 8 ثوانٍ سابقاً بلا فائدة).
         resolve(JSON.stringify(this.pc.localDescription));
-      }, 8000);
+      }, 2000);
 
       this.pc.onicegatheringstatechange = () => {
         if (this.pc.iceGatheringState === 'complete') {
