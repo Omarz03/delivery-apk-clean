@@ -1044,8 +1044,48 @@ window.setMeta = setMeta;
 window.applyLock = applyLock;
 window.releaseLock = releaseLock;
 window.clearAllData = clearAllData;
-window.allRecords = allRecords;
-window.allColumns = allColumns;
+window.applyIncomingFullDataset = applyIncomingFullDataset;
+
+/**
+ * إعادة ضبط الحالة المحلية بالكامل عند استقبال "بدء جلسة جديدة" من جهاز آخر
+ * (بدل الاكتفاء بمسح IndexedDB فقط، لازم نصفّر أيضاً المتغيرات الداخلية
+ * الفعلية التي تُستخدم فعلياً بالعرض، وإلا تبقى البيانات القديمة ظاهرة
+ * بالشاشة رغم أنها انمسحت من قاعدة البيانات).
+ */
+async function resetLocalStateForRemoteReset() {
+  await clearAllData();
+  allRecords = [];
+  allColumns = [];
+  currentSearch = '';
+  el.searchInput.value = '';
+  renderApp();
+}
+window.resetLocalStateForRemoteReset = resetLocalStateForRemoteReset;
+
+/**
+ * ضبط أعمدة البيانات من مصدر خارجي (جهاز آخر) فقط إن لم تكن معرّفة محلياً
+ * بعد. تُستخدم من sync-bridge.js عند استقبال بيانات من جهاز آخر قبل أي
+ * استيراد محلي على هذا الجهاز.
+ */
+async function setAllColumnsIfMissing(columns) {
+  if (columns?.length && allColumns.length === 0) {
+    allColumns = columns;
+    await setMeta('columns', columns);
+  }
+}
+window.setAllColumnsIfMissing = setAllColumnsIfMissing;
+
+// مرايا حيّة (live getters) بدل نسخ جامدة تُلتقط مرة واحدة فقط: أي كود خارجي
+// (مثل sync-bridge.js) يقرأ window.allRecords/allColumns/deviceId/deviceName
+// يحصل دائماً على القيمة الحالية الحقيقية للمتغيرات الداخلية أعلاه، مهما
+// تغيّرت لاحقاً (استيراد جديد، مزامنة، دمج بيانات...). هذا يمنع مشكلة "نسخة
+// قديمة جامدة" التي كانت السبب الجذري لعدم مزامنة الاستيراد وعدم عمل مبدأ
+// "الأحدث يفوز" بعد إعادة الاتصال، وعدم عمل قفل السجلات (deviceId/deviceName
+// لم يكونا مُصدَّرين إطلاقاً من قبل).
+Object.defineProperty(window, 'allRecords', { get: () => allRecords, configurable: true });
+Object.defineProperty(window, 'allColumns', { get: () => allColumns, configurable: true });
+Object.defineProperty(window, 'deviceId', { get: () => deviceId, configurable: true });
+Object.defineProperty(window, 'deviceName', { get: () => deviceName, configurable: true });
 
 
 /* -------------------------------------------------------------------------
