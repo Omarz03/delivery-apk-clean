@@ -18,6 +18,10 @@ p2p.addEventListener('channel-open', async () => {
   console.log('P2P channel open — بدء المزامنة الأولية');
   updateP2PStatusUI(true);
 
+  // "تعارف" بسيط بين الجهازين: كل طرف يرسل هويته المبسّطة (بدون معلومات
+  // حساسة) حتى تظهر بلوحة "الأجهزة المتصلة" باسم مفهوم بدل فراغ دائم.
+  p2p.send('device-hello', { deviceId: window.deviceId, deviceName: window.deviceName });
+
   // نفس منطق performInitialSync في script.js لكن عبر P2P
   if (window.allRecords && window.allRecords.length > 0) {
     p2p.send('client-data', { records: window.allRecords, columns: window.allColumns });
@@ -28,11 +32,13 @@ p2p.addEventListener('channel-open', async () => {
 p2p.addEventListener('channel-closed', () => {
   console.log('P2P channel closed');
   updateP2PStatusUI(false);
+  renderConnectedDevice(null);
   window.showToast?.('انقطع الاتصال بالجهاز الآخر — التطبيق يعمل محلياً', 'info', 3000);
 });
 
 p2p.addEventListener('disconnected', () => {
   updateP2PStatusUI(false);
+  renderConnectedDevice(null);
 });
 
 p2p.addEventListener('transfer-incomplete', (event) => {
@@ -52,6 +58,11 @@ p2p.addEventListener('message', async (event) => {
   const { type, payload } = event.detail;
 
   switch (type) {
+    case 'device-hello': {
+      renderConnectedDevice({ deviceId: payload?.deviceId, deviceName: payload?.deviceName });
+      break;
+    }
+
     case 'client-data': {
       // جهاز آخر يرسل بياناته — ندمج ونرد بنسختنا المدمجة
       if (!payload?.records?.length) break;
@@ -160,6 +171,39 @@ window.p2pBroadcastUnlock = (syncId) => {
 window.p2pBroadcastReset = () => {
   p2p.send('session-reset', {});
 };
+
+/* -----------------------------------------------------------------------
+   تحديث لوحة "الأجهزة المتصلة" — لدينا اتصال مباشر (P2P) بجهاز واحد فقط،
+   فنعرض إما بطاقة الجهاز المتصل حالياً أو رسالة "لا يوجد اتصال".
+   ----------------------------------------------------------------------- */
+function renderConnectedDevice(peer) {
+  const list = document.getElementById('devicesList');
+  const emptyMsg = document.getElementById('devicesEmptyMsg');
+  const countBadge = document.getElementById('devicesCountBadge');
+  if (!list || !emptyMsg) return;
+
+  if (!peer) {
+    list.innerHTML = '';
+    emptyMsg.classList.remove('hidden');
+    if (countBadge) countBadge.classList.add('hidden');
+    return;
+  }
+
+  emptyMsg.classList.add('hidden');
+  const safeName = document.createElement('div');
+  safeName.textContent = peer.deviceName || 'جهاز غير معروف';
+
+  list.innerHTML = `
+    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/50">
+      <span class="w-2 h-2 rounded-full bg-delivered shrink-0"></span>
+      <span class="font-medium text-sm">${safeName.innerHTML}</span>
+    </li>
+  `;
+  if (countBadge) {
+    countBadge.textContent = '1';
+    countBadge.classList.remove('hidden');
+  }
+}
 
 /* -----------------------------------------------------------------------
    تحديث واجهة حالة P2P (شارة الاتصال في الهيدر)
