@@ -933,13 +933,14 @@ function broadcastUnlockRecord(syncId) {
 
 /**
  * تطبيق قفل وارد من جهاز آخر على سجل معيّن (تستدعيها sync-bridge.js عند
- * استقبال رسالة قفل عبر WebRTC P2P). نخزّن معلومات الجهاز القافل، ونضبط
- * مؤقّت احتياطي 30 ثانية يفكّ القفل تلقائياً إن لم يصل إعلام فكّ قفل صريح
- * (مثلاً بسبب انقطاع اتصال الجهاز الآخر).
+ * استقبال رسالة قفل عبر WebRTC P2P، بالشكل: applyLock(syncId, ownerId, ownerName)).
+ * نخزّن معلومات الجهاز القافل، ونضبط مؤقّت احتياطي 30 ثانية يفكّ القفل تلقائياً
+ * إن لم يصل إعلام فكّ قفل صريح (مثلاً بسبب انقطاع اتصال الجهاز الآخر).
  * @param {string} syncId
- * @param {{ deviceId?: string, deviceName?: string }} [lockInfo]
+ * @param {string} [deviceId]
+ * @param {string} [deviceName]
  */
-function applyLock(syncId, lockInfo = {}) {
+function applyLock(syncId, deviceId, deviceName) {
   if (!syncId) return;
 
   // إن كان هناك مؤقّت سابق لنفس السجل، نلغيه قبل ضبط مؤقّت جديد
@@ -948,8 +949,8 @@ function applyLock(syncId, lockInfo = {}) {
   }
 
   lockedRecords.set(syncId, {
-    deviceId: lockInfo.deviceId || null,
-    deviceName: lockInfo.deviceName || 'جهاز آخر',
+    deviceId: deviceId || null,
+    deviceName: deviceName || 'جهاز آخر',
     expiresAt: Date.now() + 30000,
   });
 
