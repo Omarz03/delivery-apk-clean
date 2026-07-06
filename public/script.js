@@ -284,6 +284,27 @@ function detectIdentifierColumn(rows, columns) {
   return best;
 }
 
+/**
+ * محاولة اكتشاف عمود "اسم المستفيد" من بين أعمدة الملف المستورد، لاستخدامه
+ * لاحقاً في تعبئة "اسم المستلم" تلقائياً إن تُرك فارغاً. نفضّل عموداً اسمه
+ * "الاسم" حرفياً، ثم أي عمود يحوي كلمة "اسم" لكن ليس اسم والد/زوج/أم (تفادياً
+ * لأعمدة مثل "اسم الأب")، وإلا نرجع أول عمود كحل احتياطي أخير.
+ */
+function detectNameColumn(columns) {
+  const exact = columns.find((col) => col.trim() === 'الاسم' || col.trim() === 'اسم المستفيد');
+  if (exact) return exact;
+
+  const excludeHints = /(والد|أب|اب\b|زوج|أم\b|ام\b|مستلم)/;
+  const nameHint = columns.find((col) => /اسم|name/i.test(col) && !excludeHints.test(col));
+  if (nameHint) return nameHint;
+
+  return columns[0] || null;
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/"/g, '&quot;');
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -685,8 +706,12 @@ function renderTableRows() {
         ? `<span class="status-badge status-badge--delivered" data-tip="تم الاستلام" aria-label="تم الاستلام"></span>`
         : `<span class="status-badge status-badge--pending" data-tip="لم يتم الاستلام" aria-label="لم يتم الاستلام"></span>`;
 
+      const editedFields = record.__editedFields || [];
       const dataCells = allColumns
-        .map((col) => `<td>${escapeHtml(record[col])}</td>`)
+        .map((col) => {
+          const cellStyle = editedFields.includes(col) ? ' style="background:#FEF3C7;"' : '';
+          return `<td${cellStyle}>${escapeHtml(record[col])}</td>`;
+        })
         .join('');
 
       const lockedClass = isLockedByOther ? ' row-locked' : '';
@@ -783,13 +808,15 @@ function openDrawer(id) {
   openRecordId = id;
 
   el.drawerOriginalData.innerHTML = allColumns
-    .map(
-      (col) => `
-      <div class="drawer-field">
-        <span class="label">${escapeHtml(col)}</span>
-        <span class="value">${escapeHtml(record[col]) || '—'}</span>
-      </div>`
-    )
+    .map((col) => {
+      const isEdited = (record.__editedFields || []).includes(col);
+      const highlightStyle = isEdited ? ' style="background:#FEF3C7;border-radius:8px;padding:6px 8px;"' : '';
+      return `
+      <div class="drawer-field"${highlightStyle}>
+        <label class="label" for="">${escapeHtml(col)}${isEdited ? ' <span style="color:#B45309;font-weight:600;">(معدّل)</span>' : ''}</label>
+        <input type="text" class="value drawer-original-input" data-column="${escapeAttr(col)}" value="${escapeAttr(record[col] ?? '')}" />
+      </div>`;
+    })
     .join('');
 
   setStatusToggle(Boolean(record.__status));
@@ -840,11 +867,40 @@ el.drawerSave.addEventListener('click', async () => {
   const record = allRecords.find((r) => r.id === openRecordId);
   if (!record) return;
 
+  // جمع القيم الجديدة من حقول البيانات الأصلية (صارت قابلة للتعديل الآن)
+  // وتحديد أي الحقول تغيّرت فعلياً عن قيمتها الحالية بالسجل.
+  const editedFields = new Set(record.__editedFields || []);
+  const updatedFieldValues = {};
+  el.drawerOriginalData.querySelectorAll('.drawer-original-input').forEach((input) => {
+    const col = input.dataset.column;
+    const newVal = input.value.trim();
+    updatedFieldValues[col] = newVal;
+    if (newVal !== String(record[col] ?? '').trim()) {
+      editedFields.add(col);
+    }
+  });
+
+  const statusChecked = el.statusToggle.dataset.checked === 'true';
+  let receiverValue = el.receiverInput.value.trim();
+
+  // لو تُرك اسم المستلم فاضياً، نعبّئه تلقائياً باسم المستفيد نفسه (من عمود
+  // الاسم المكتشف بالبيانات الأصلية، مع مراعاة أي تعديل عليه بنفس الحفظة).
+  if (!receiverValue) {
+    const nameCol = detectNameColumn(allColumns);
+    const beneficiaryName = nameCol ? (updatedFieldValues[nameCol] ?? record[nameCol]) : null;
+    if (beneficiaryName) {
+      receiverValue = String(beneficiaryName).trim();
+      el.receiverInput.value = receiverValue; // انعكاس فوري بالحقل بالواجهة
+    }
+  }
+
   const updated = {
     ...record,
-    __status: el.statusToggle.dataset.checked === 'true',
-    __receiver: el.receiverInput.value.trim(),
+    ...updatedFieldValues,
+    __status: statusChecked,
+    __receiver: receiverValue,
     __notes: el.notesInput.value.trim(),
+    __editedFields: Array.from(editedFields),
     __updatedAt: Date.now(),
   };
 
@@ -875,6 +931,10 @@ el.exportBtn.addEventListener('click', () => {
     row['الحالة'] = record.__status ? 'تم الاستلام' : 'لم يتم الاستلام';
     row['اسم المستلم'] = record.__receiver || '';
     row['ملاحظات'] = record.__notes || '';
+    // عمود إضافي يوضّح أي حقول من البيانات الأصلية عُدّلت يدوياً بعد الاستيراد
+    // (بديل مضمون 100% عن تلوين الخلايا، الذي لا تدعمه مكتبة الإكسل المجانية
+    // بثقة عند الكتابة).
+    row['الحقول المعدّلة'] = (record.__editedFields || []).join('، ');
     return row;
   });
 
