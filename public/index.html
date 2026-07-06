@@ -241,17 +241,6 @@
 
       <!-- شريط البحث: بحث عام + بحث برقم الصف + زر مسح -->
       <div class="flex items-center gap-2">
-        <!-- البحث العام -->
-        <div class="relative flex-1">
-          <svg class="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink/35" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
-          <input
-            id="searchInput"
-            type="text"
-            placeholder="بحث باسم أو هوية..."
-            class="w-full bg-white border border-line rounded-xl py-2.5 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay transition-shadow"
-            autocomplete="off"
-          />
-        </div>
 
         <!-- بحث برقم الصف -->
         <button id="rowSearchToggle" class="shrink-0 h-10 px-3 bg-white border border-line rounded-xl text-ink/55 hover:text-ink hover:border-clay/60 transition-colors text-xs font-bold font-mono" title="بحث برقم الصف">
@@ -265,6 +254,18 @@
             placeholder="رقم..."
             class="w-full bg-white border border-line rounded-xl py-2.5 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay transition-shadow"
             dir="ltr"
+          />
+        </div>
+        
+        <!-- البحث العام -->
+        <div class="relative flex-1">
+          <svg class="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink/35" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="بحث باسم أو هوية..."
+            class="w-full bg-white border border-line rounded-xl py-2.5 pr-10 pl-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay transition-shadow"
+            autocomplete="off"
           />
         </div>
 
