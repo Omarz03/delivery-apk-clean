@@ -709,8 +709,8 @@ function renderTableRows() {
       const editedFields = record.__editedFields || [];
       const dataCells = allColumns
         .map((col) => {
-          const cellStyle = editedFields.includes(col) ? ' style="background:#FEF3C7;"' : '';
-          return `<td${cellStyle}>${escapeHtml(record[col])}</td>`;
+          const cellClass = editedFields.includes(col) ? ' class="cell-edited"' : '';
+          return `<td${cellClass}>${escapeHtml(record[col])}</td>`;
         })
         .join('');
 
@@ -810,10 +810,9 @@ function openDrawer(id) {
   el.drawerOriginalData.innerHTML = allColumns
     .map((col) => {
       const isEdited = (record.__editedFields || []).includes(col);
-      const highlightStyle = isEdited ? ' style="background:#FEF3C7;border-radius:8px;padding:6px 8px;"' : '';
       return `
-      <div class="drawer-field"${highlightStyle}>
-        <label class="label" for="">${escapeHtml(col)}${isEdited ? ' <span style="color:#B45309;font-weight:600;">(معدّل)</span>' : ''}</label>
+      <div class="drawer-field${isEdited ? ' drawer-field--edited' : ''}">
+        <span class="label">${escapeHtml(col)}${isEdited ? ' <span class="edited-tag">(معدّل)</span>' : ''}</span>
         <input type="text" class="value drawer-original-input" data-column="${escapeAttr(col)}" value="${escapeAttr(record[col] ?? '')}" />
       </div>`;
     })
