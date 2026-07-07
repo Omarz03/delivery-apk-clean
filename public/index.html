@@ -215,7 +215,7 @@
 
         <!-- قطع الاتصال — يظهر فقط عند الاتصال -->
         <button id="p2pDisconnectBtn" class="hidden mt-2 w-full text-sm font-medium text-pending/80 hover:text-pending py-2 rounded-xl border border-line hover:border-pending/40 transition-colors"
-          onclick="window.deliveryP2P.disconnect(); document.getElementById('p2pDisconnectBtn').classList.add('hidden');">
+          onclick="window.deliveryP2P.disconnect(); window.clearLastSessionRole?.(); document.getElementById('p2pDisconnectBtn').classList.add('hidden');">
           قطع الاتصال
         </button>
 
@@ -376,6 +376,10 @@
       document.getElementById('p2pReconnectBtn')?.classList.add('hidden');
       document.getElementById('syncDot').className = 'w-2 h-2 rounded-full bg-delivered';
       document.getElementById('syncLabel').textContent = 'جلسة نشطة';
+      // نحفظ الدور حتى نقدر نعرض شريط "استئناف الجلسة" لو أُغلق التطبيق
+      // بالكامل لاحقاً وأُعيد فتحه.
+      window.saveLastSessionRole?.(window.deliveryP2P.role);
+      document.getElementById('resumeSessionBanner')?.remove();
     });
     window.deliveryP2P.addEventListener('channel-closed', () => {
       document.getElementById('p2pDisconnectBtn')?.classList.add('hidden');
