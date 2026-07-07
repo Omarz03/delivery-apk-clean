@@ -331,6 +331,18 @@ function escapeHtml(value) {
 }
 
 /**
+ * تنسيق طابع زمني (Date.now()) كنص "yyyy-MM-dd HH:mm" ثابت وغير قابل للبس،
+ * بعيداً عن أرقام هندية عربية أو تنسيقات محلية متغيرة قد تربك عرض الأرقام
+ * داخل خلايا Excel. تُستخدم لعمود "وقت التسليم" بالتقرير المُصدَّر.
+ */
+function formatDeliveryTimestamp(timestamp) {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
  * توليد معرّف فريد ثابت (__syncId) يُستخدم للتعرّف على "نفس السجل" عبر
  * أجهزة مختلفة، بخلاف 'id' التلقائي في IndexedDB الذي يختلف من جهاز لآخر.
  */
@@ -366,6 +378,68 @@ async function ensureDeviceIdentity() {
   deviceId = storedId;
   deviceName = storedName;
 }
+
+/* -------------------------------------------------------------------------
+   لوحة "الأجهزة المتصلة" — تعرض جهازك دائماً ("أنت")، بالإضافة للجهاز الآخر
+   إن كان متصلاً حالياً. سابقاً كانت اللوحة تعرض فقط الجهاز الآخر (أو رسالة
+   فراغ)، فكان جهازك نفسه لا يظهر إطلاقاً حتى أثناء الاتصال الفعلي.
+   ------------------------------------------------------------------------- */
+function renderDevicesList(peer) {
+  if (!el.devicesList || !el.devicesEmptyMsg) return;
+
+  el.devicesEmptyMsg.classList.add('hidden'); // جهازك نفسه موجود بالقائمة دائماً
+
+  const selfItem = `
+    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pine/5 border border-line">
+      <span class="w-2 h-2 rounded-full bg-clay shrink-0"></span>
+      <span class="font-medium text-sm flex-1 truncate">${escapeHtml(deviceName || 'هذا الجهاز')} <span class="text-ink/40 font-normal">(أنت)</span></span>
+      <button onclick="window.renameThisDevice?.()" class="text-ink/40 hover:text-ink p-1 rounded-lg shrink-0" aria-label="تعديل اسمك" title="تعديل اسمك الظاهر لبقية الأجهزة">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+    </li>
+  `;
+
+  const peerItem = peer
+    ? `
+    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/50">
+      <span class="w-2 h-2 rounded-full bg-delivered shrink-0"></span>
+      <span class="font-medium text-sm truncate">${escapeHtml(peer.deviceName || 'جهاز غير معروف')}</span>
+    </li>
+  `
+    : '';
+
+  el.devicesList.innerHTML = selfItem + peerItem;
+
+  if (el.devicesCountBadge) {
+    el.devicesCountBadge.textContent = String(peer ? 2 : 1);
+    el.devicesCountBadge.classList.remove('hidden');
+  }
+}
+window.renderDevicesList = renderDevicesList;
+
+/**
+ * يتيح للمستخدم تخصيص اسمه الظاهر لبقية الأجهزة (بدل الاسم التلقائي
+ * "موبايل • xxxx")، مهم خصوصاً لتمييز اسم الموظف الفعلي بتقرير التسليم
+ * المُصدَّر لاحقاً (عمود "اسم المستخدم المسلِّم").
+ */
+async function renameThisDevice() {
+  const current = deviceName || '';
+  const next = window.prompt('اسمك الظاهر لبقية الأجهزة (يُستخدم أيضاً بتقرير التسليم):', current);
+  if (next === null) return; // المستخدم ألغى
+  const trimmed = next.trim();
+  if (!trimmed || trimmed === current) return;
+
+  deviceName = trimmed;
+  await setMeta('deviceName', trimmed);
+  renderDevicesList(window.deliveryP2P?.connected ? window.__lastKnownPeer : null);
+  window.showToast?.('تم تحديث اسمك بنجاح', 'success', 2000);
+
+  // نعلم الجهاز المتصل حالياً (إن وُجد) بالاسم الجديد فوراً
+  if (window.deliveryP2P?.connected) {
+    window.deliveryP2P.send('device-hello', { deviceId, deviceName });
+  }
+}
+window.renameThisDevice = renameThisDevice;
 
 /**
  * عرض إشعار منبثق (Toast) قصير في أسفل الشاشة، يختفي تلقائياً. يُستخدم
@@ -981,6 +1055,23 @@ el.drawerSave.addEventListener('click', async () => {
     __updatedAt: Date.now(),
   };
 
+  // نسجّل من قام فعلياً بعملية التسليم ومتى — فقط لحظة الانتقال الحقيقي إلى
+  // "تم الاستلام" (وليس أي حفظ لاحق لا يغيّر الحالة، كتعديل ملاحظة مثلاً)،
+  // حتى لا نفقد بيانات أول تسليم فعلي بتعديلات لاحقة. لو تراجع المستخدم عن
+  // "تم الاستلام" (تصحيح خطأ)، نمسح النسبة لتبقى متسقة مع الحالة الفعلية.
+  const wasDelivered = record.__status === true;
+  if (statusChecked && !wasDelivered) {
+    updated.__deliveredByName = deviceName || 'غير معروف';
+    updated.__deliveredByDeviceId = deviceId || null;
+    updated.__deliveredAt = Date.now();
+  } else if (!statusChecked) {
+    updated.__deliveredByName = null;
+    updated.__deliveredByDeviceId = null;
+    updated.__deliveredAt = null;
+  }
+  // (الحالة الثالثة: كانت مُسلَّمة وضلّت مُسلَّمة — نُبقي بيانات أول تسليم
+  // كما هي تلقائياً، لأننا لم نلمسها أعلاه، وهي محفوظة أصلاً بـ ...record)
+
   await updateRecord(updated);
 
   // تحديث النسخة المحلية في الذاكرة بدل إعادة القراءة الكاملة من القاعدة
@@ -1007,6 +1098,8 @@ el.exportBtn.addEventListener('click', () => {
     });
     row['الحالة'] = record.__status ? 'تم الاستلام' : 'لم يتم الاستلام';
     row['اسم المستلم'] = record.__receiver || '';
+    row['اسم المستخدم المسلِّم'] = record.__deliveredByName || '';
+    row['وقت التسليم'] = formatDeliveryTimestamp(record.__deliveredAt);
     row['ملاحظات'] = record.__notes || '';
     // عمود إضافي يوضّح أي حقول من البيانات الأصلية عُدّلت يدوياً بعد الاستيراد
     // (بديل مضمون 100% عن تلوين الخلايا، الذي لا تدعمه مكتبة الإكسل المجانية
@@ -1387,6 +1480,7 @@ function setupBackButtonGuard() {
     renderApp();
 
     await ensureDeviceIdentity();
+    renderDevicesList(null); // يعرض جهازك ("أنت") فوراً حتى بدون أي اتصال
 
     // إن كان قد سبق واتصل هذا الجهاز بخادم مزامنة، نعبّئ العنوان تلقائياً
     // ونحاول إعادة الاتصال به دون تدخل المستخدم.
