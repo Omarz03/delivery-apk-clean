@@ -12,11 +12,46 @@
 const p2p = window.deliveryP2P;
 
 /* -----------------------------------------------------------------------
+   قفل الشاشة عن النوم أثناء الجلسة النشطة (Wake Lock)
+   -------------------------------------------------------------------------
+   قفل شاشة الموبايل التلقائي يوقف نشاط الشبكة بالخلفية على أغلب أجهزة
+   أندرويد، وهذا سبب شائع جداً لانقطاع اتصال WebRTC رغم بقاء الجهازين على
+   نفس الشبكة فعلياً. نطلب Wake Lock فقط أثناء وجود اتصال P2P نشط، ونحرره
+   فوراً عند الانقطاع حتى لا نستهلك البطارية بلا داعٍ.
+   ----------------------------------------------------------------------- */
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (e) {
+    // شائع أن يفشل الطلب لو الصفحة بالخلفية وقت الطلب — غير حرج، نتجاهله
+    console.warn('تعذّر تفعيل قفل الشاشة (Wake Lock):', e);
+  }
+}
+
+function releaseWakeLock() {
+  wakeLock?.release?.().catch(() => {});
+  wakeLock = null;
+}
+
+// Wake Lock يُلغى تلقائياً من المتصفح عند تصغير التطبيق/تبديل التبويب —
+// نعيد طلبه فور عودة الظهور إن كان الاتصال لا يزال نشطاً.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && p2p.connected && !wakeLock) {
+    requestWakeLock();
+  }
+});
+
+/* -----------------------------------------------------------------------
    ربط أحداث P2P بمنطق script.js الموجود
    ----------------------------------------------------------------------- */
 p2p.addEventListener('channel-open', async () => {
   console.log('P2P channel open — بدء المزامنة الأولية');
   updateP2PStatusUI(true);
+  await requestWakeLock();
 
   // "تعارف" بسيط بين الجهازين: كل طرف يرسل هويته المبسّطة (بدون معلومات
   // حساسة) حتى تظهر بلوحة "الأجهزة المتصلة" باسم مفهوم بدل فراغ دائم.
@@ -33,12 +68,14 @@ p2p.addEventListener('channel-closed', () => {
   console.log('P2P channel closed');
   updateP2PStatusUI(false);
   renderConnectedDevice(null);
+  releaseWakeLock();
   window.showToast?.('انقطع الاتصال بالجهاز الآخر — التطبيق يعمل محلياً', 'info', 3000);
 });
 
 p2p.addEventListener('disconnected', () => {
   updateP2PStatusUI(false);
   renderConnectedDevice(null);
+  releaseWakeLock();
 });
 
 p2p.addEventListener('transfer-incomplete', (event) => {
