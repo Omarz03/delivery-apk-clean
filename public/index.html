@@ -65,6 +65,11 @@
             <span id="p2pStatusDot" class="w-2 h-2 rounded-full bg-ink/25"></span>
             <span id="p2pStatusLabel">غير متصل</span>
           </span>
+          <!-- زر إعادة الاتصال — يظهر فقط بعد انقطاع اتصال كانت له جلسة سابقة -->
+          <button id="p2pReconnectBtn" class="hidden inline-flex items-center gap-1.5 bg-clay hover:bg-clayLight transition-colors px-2.5 py-1.5 rounded-full font-semibold text-white" title="محاولة إعادة الاتصال بالجهاز الآخر">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+            <span class="hidden sm:inline">إعادة الاتصال</span>
+          </button>
           <!-- زر الأجهزة -->
           <button id="devicesPanelToggle" class="relative inline-flex items-center gap-2 bg-pineLight/70 hover:bg-pineLight transition-colors px-3 py-2 rounded-xl font-semibold" title="الأجهزة المتصلة">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="10" rx="1.5"/><path d="M6 18h6M9 14v4"/><rect x="17" y="9" width="5" height="9" rx="1"/></svg>
@@ -368,6 +373,7 @@
     // عرض زر "قطع الاتصال" تلقائياً عند اكتمال الاتصال P2P
     window.deliveryP2P.addEventListener('channel-open', () => {
       document.getElementById('p2pDisconnectBtn')?.classList.remove('hidden');
+      document.getElementById('p2pReconnectBtn')?.classList.add('hidden');
       document.getElementById('syncDot').className = 'w-2 h-2 rounded-full bg-delivered';
       document.getElementById('syncLabel').textContent = 'جلسة نشطة';
     });
@@ -378,6 +384,58 @@
     });
     window.deliveryP2P.addEventListener('disconnected', () => {
       document.getElementById('p2pDisconnectBtn')?.classList.add('hidden');
+      // الزر يظهر فقط لو كانت هناك جلسة فعلاً قبل هيك (role محدد) — لا معنى
+      // له عند التحميل الأول للصفحة قبل أي اتصال إطلاقاً.
+      if (window.deliveryP2P.role) {
+        document.getElementById('p2pReconnectBtn')?.classList.remove('hidden');
+      }
+    });
+
+    /* -----------------------------------------------------------------------
+       زر "إعادة الاتصال" — يحاول أولاً استرجاعاً صامتاً (يعمل فقط لو الجهاز
+       الآخر لا يزال فعلياً فاتحاً للتطبيق على نفس الشبكة)، وإن لم ينجح خلال
+       مهلة قصيرة يفتح مباشرة لوحة الجلسة لإعادة المسح — مع العلم أن البيانات
+       المحلية لا تُمسح أبداً في الحالتين.
+       ----------------------------------------------------------------------- */
+    document.getElementById('p2pReconnectBtn')?.addEventListener('click', function () {
+      const btn = this;
+      btn.disabled = true;
+      const labelEl = btn.querySelector('span:last-child');
+      const originalLabel = labelEl.textContent;
+      labelEl.textContent = 'جارٍ المحاولة…';
+
+      window.deliveryP2P.tryReconnect?.();
+
+      const fallbackTimer = setTimeout(() => {
+        btn.disabled = false;
+        labelEl.textContent = originalLabel;
+        window.showToast?.(
+          'تعذّر الاسترجاع التلقائي — الجهاز الآخر غالباً أغلق التطبيق فعلياً. بياناتك محفوظة محلياً، فقط أعد مسح رمز QR لإكمال الاتصال.',
+          'info',
+          5000
+        );
+        // ننادي مباشرة تدفق الدور المحفوظ من الجلسة السابقة (مضيف/تابع) —
+        // بضغطة وحدة بدل فتح اللوحة وترك المستخدم يختار يدوياً من جديد.
+        // بياناتك المحلية لا تُمسح في أي من الحالتين.
+        const savedRole = window.deliveryP2P.role;
+        if (savedRole === 'host') {
+          window.startHostSession?.(true);
+        } else if (savedRole === 'peer') {
+          window.startPeerSession?.(true);
+        } else {
+          // احتياطي نادر: لا يوجد دور محفوظ لأي سبب — نرجع للوحة العادية
+          window.openSessionPanel?.();
+        }
+      }, 4000);
+
+      // لو نجح الاسترجاع الصامت (نفس الشبكة، التطبيق الآخر لسا مفتوح)، حدث
+      // channel-open رح يوصل قبل انتهاء المهلة أعلاه ويلغيها.
+      window.deliveryP2P.addEventListener('channel-open', function onReconnected() {
+        clearTimeout(fallbackTimer);
+        btn.disabled = false;
+        labelEl.textContent = originalLabel;
+        window.deliveryP2P.removeEventListener('channel-open', onReconnected);
+      });
     });
   </script>
 </body>
