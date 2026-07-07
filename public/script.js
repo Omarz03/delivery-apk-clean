@@ -422,6 +422,7 @@ function openSessionPanel() {
   el.sessionPanel.setAttribute('aria-hidden', 'false');
   el.sessionPanelOverlay.classList.add('open');
 }
+window.openSessionPanel = openSessionPanel; // يُستخدم من زر "إعادة الاتصال" بـ index.html
 
 function closeSessionPanel() {
   el.sessionPanel.classList.remove('open');
