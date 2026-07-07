@@ -209,12 +209,17 @@ function startAnimatedQRScan(videoContainerId, options = {}) {
    خطوة ١: إنشاء Offer وعرضها كـ QR
    خطوة ٢: مسح Answer من التابع
    ----------------------------------------------------------------------- */
-async function startHostSession() {
+async function startHostSession(isReconnect = false) {
   const modal = document.getElementById('sessionModal');
-  modal.innerHTML = buildModalShell('إنشاء جلسة تسليم', `
+  const title = isReconnect ? 'إعادة الاتصال' : 'إنشاء جلسة تسليم';
+  const step1Desc = isReconnect
+    ? 'الاتصال السابق انقطع لكن بياناتك محفوظة بالكامل. اطلب من الجهاز الآخر مسح هذا الكود لاستئناف الجلسة.'
+    : 'اطلب من الجهاز الآخر فتح التطبيق والضغط على "انضم لجلسة" ثم مسح هذا الكود.';
+
+  modal.innerHTML = buildModalShell(title, `
     <div id="hostStep1" class="session-step">
       <p class="step-label">الخطوة ١ من ٢ — اعرض هذا الكود للتابع</p>
-      <p class="step-desc">اطلب من الجهاز الآخر فتح التطبيق والضغط على "انضم لجلسة" ثم مسح هذا الكود.</p>
+      <p class="step-desc">${step1Desc}</p>
       <div id="hostOfferQR" class="qr-container"><div class="qr-spinner"></div></div>
       <button id="hostScanAnswerBtn" class="btn-primary mt-4 w-full">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
@@ -231,7 +236,7 @@ async function startHostSession() {
 
     <div id="hostConnected" class="session-step hidden">
       <div class="success-icon">✓</div>
-      <p class="step-label text-delivered">تم الاتصال بنجاح!</p>
+      <p class="step-label text-delivered">${isReconnect ? 'تم استئناف الاتصال بنجاح!' : 'تم الاتصال بنجاح!'}</p>
       <p class="step-desc">الجلسة نشطة. يمكنك الآن إغلاق هذه النافذة والبدء بالتسليم.</p>
       <button id="hostCloseBtn" class="btn-primary mt-4 w-full">ابدأ العمل</button>
     </div>
@@ -294,12 +299,17 @@ async function startHostSession() {
    خطوة ١: مسح QR المضيف
    خطوة ٢: عرض Answer كـ QR للمضيف
    ----------------------------------------------------------------------- */
-async function startPeerSession() {
+async function startPeerSession(isReconnect = false) {
   const modal = document.getElementById('sessionModal');
-  modal.innerHTML = buildModalShell('الانضمام لجلسة', `
+  const title = isReconnect ? 'إعادة الاتصال' : 'الانضمام لجلسة';
+  const step1Desc = isReconnect
+    ? 'الاتصال السابق انقطع لكن بياناتك محفوظة بالكامل. وجّه الكاميرا نحو الكود المتحرك على شاشة الجهاز الرئيسي لاستئناف الجلسة.'
+    : 'وجّه الكاميرا نحو الكود المتحرك الظاهر على شاشة الجهاز الرئيسي.';
+
+  modal.innerHTML = buildModalShell(title, `
     <div id="peerStep1" class="session-step">
       <p class="step-label">الخطوة ١ من ٢ — امسح كود المضيف</p>
-      <p class="step-desc">وجّه الكاميرا نحو الكود المتحرك الظاهر على شاشة الجهاز الرئيسي.</p>
+      <p class="step-desc">${step1Desc}</p>
       <div id="peerScanVideo" class="scan-container"></div>
       <p id="peerScanProgress" class="step-hint">استمر بتوجيه الكاميرا نحو الكود...</p>
       <button id="peerCancelBtn" class="btn-secondary mt-3 w-full">إلغاء</button>
@@ -314,7 +324,7 @@ async function startPeerSession() {
 
     <div id="peerConnected" class="session-step hidden">
       <div class="success-icon">✓</div>
-      <p class="step-label text-delivered">تم الاتصال بنجاح!</p>
+      <p class="step-label text-delivered">${isReconnect ? 'تم استئناف الاتصال بنجاح!' : 'تم الاتصال بنجاح!'}</p>
       <p class="step-desc">الجلسة نشطة. يمكنك الآن إغلاق هذه النافذة والبدء بالتسليم.</p>
       <button id="peerCloseBtn" class="btn-primary mt-4 w-full">ابدأ العمل</button>
     </div>
