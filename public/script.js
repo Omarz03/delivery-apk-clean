@@ -424,6 +424,61 @@ function openSessionPanel() {
 }
 window.openSessionPanel = openSessionPanel; // يُستخدم من زر "إعادة الاتصال" بـ index.html
 
+/* -------------------------------------------------------------------------
+   شريط "كان عندك جلسة سابقة" — يظهر عند فتح التطبيق إن وُجدت جلسة P2P
+   محفوظة (state: lastSessionRole)، حتى لو كان الإغلاق بالكامل (مو بس
+   تصغير). الضغط عليه يستأنف نفس تدفق QR بضغطة واحدة (دور محفوظ)، بدل ما
+   يضطر المستخدم يفتح اللوحة ويختار "مضيف"/"تابع" يدوياً من جديد.
+   ------------------------------------------------------------------------- */
+function showResumeSessionBanner(role) {
+  if (window.deliveryP2P?.connected) return; // متصل فعلاً، لا داعي للتذكير
+
+  const banner = document.createElement('div');
+  banner.id = 'resumeSessionBanner';
+  banner.className =
+    'fixed inset-x-0 top-0 z-[70] bg-clay text-white px-4 py-3 flex items-center justify-between gap-3 shadow-sm';
+  banner.innerHTML = `
+    <span class="text-sm font-medium">كان عندك جلسة تسليم سابقة (${role === 'host' ? 'كمضيف' : 'كتابع'}) — هل تريد استئنافها؟</span>
+    <div class="flex items-center gap-2 shrink-0">
+      <button id="resumeSessionBtn" class="bg-white/20 hover:bg-white/30 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">استئناف</button>
+      <button id="dismissResumeBtn" class="text-white/70 hover:text-white px-2 py-1.5 text-sm" aria-label="تجاهل">✕</button>
+    </div>
+  `;
+  document.body.prepend(banner);
+
+  document.getElementById('resumeSessionBtn').addEventListener('click', () => {
+    banner.remove();
+    if (role === 'host') window.startHostSession?.(true);
+    else window.startPeerSession?.(true);
+  });
+
+  document.getElementById('dismissResumeBtn').addEventListener('click', () => {
+    banner.remove();
+    clearLastSessionRole();
+  });
+}
+
+/** تُستدعى فور نجاح أي اتصال P2P (channel-open) لحفظ الدور للاستئناف لاحقاً. */
+async function saveLastSessionRole(role) {
+  try {
+    await setMeta('lastSessionRole', role);
+  } catch (e) {
+    console.warn('تعذّر حفظ دور الجلسة (غير حرج):', e);
+  }
+}
+window.saveLastSessionRole = saveLastSessionRole;
+
+/** تُستدعى عند إنهاء الجلسة يدوياً (زر قطع الاتصال) أو تجاهل شريط الاستئناف. */
+async function clearLastSessionRole() {
+  document.getElementById('resumeSessionBanner')?.remove();
+  try {
+    await setMeta('lastSessionRole', null);
+  } catch (e) {
+    console.warn('تعذّر مسح دور الجلسة (غير حرج):', e);
+  }
+}
+window.clearLastSessionRole = clearLastSessionRole;
+
 function closeSessionPanel() {
   el.sessionPanel.classList.remove('open');
   el.sessionPanel.setAttribute('aria-hidden', 'true');
@@ -1209,6 +1264,41 @@ if ('serviceWorker' in navigator) {
    ------------------------------------------------------------------------- */
 function setupBackButtonGuard() {
   const EXIT_CONFIRM_WINDOW_MS = 2000;
+
+  /**
+   * تتحقق من أي قائمة جانبية/نافذة مفتوحة حالياً وتسكرها (بمثابة الضغط على
+   * "إلغاء" أو ×)، وتُعيد true إن كانت أغلقت شيئاً فعلاً. هذا يمنع إغلاق
+   * التطبيق بالكامل بالخطأ فقط لأن المستخدم كان يقصد يسكر قائمة مفتوحة —
+   * وهو من أكثر أسباب الخروج غير المقصود شيوعاً كما لوحظ فعلياً بالاستخدام.
+   * الترتيب مهم: نتحقق من الأعمق (نافذة QR) قبل الأسطح الأبعد.
+   */
+  function closeTopmostOverlay() {
+    if (document.getElementById('sessionModal')?.classList.contains('open')) {
+      window.closeModal?.();
+      return true;
+    }
+    if (el.identifierModal && !el.identifierModal.classList.contains('hidden')) {
+      closeIdentifierModal();
+      return true;
+    }
+    if (el.drawer?.classList.contains('open')) {
+      closeDrawer();
+      return true;
+    }
+    if (el.devicesPanel?.classList.contains('open')) {
+      closeDevicesPanel();
+      return true;
+    }
+    if (el.sessionPanel?.classList.contains('open')) {
+      closeSessionPanel();
+      return true;
+    }
+    if (document.getElementById('resumeSessionBanner')) {
+      document.getElementById('resumeSessionBanner').remove();
+      return true;
+    }
+    return false;
+  }
   let awaitingExitConfirm = false;
   let exitConfirmTimer = null;
 
@@ -1224,6 +1314,9 @@ function setupBackButtonGuard() {
   // "معالج القرار" المشترك: يُستدعى من أي مصدر (Capacitor أو popstate) عند
   // ضغطة رجوع واحدة، ويُعيد true إن كان يجب فعلاً الخروج الآن.
   function shouldExitNow() {
+    // أولوية قصوى: أي قائمة/نافذة مفتوحة تُغلق بدل اعتبار الضغطة محاولة خروج.
+    if (closeTopmostOverlay()) return false;
+
     const sessionActive = window.deliveryP2P?.connected === true;
 
     if (sessionActive) {
@@ -1298,6 +1391,17 @@ function setupBackButtonGuard() {
     // إن كان قد سبق واتصل هذا الجهاز بخادم مزامنة، نعبّئ العنوان تلقائياً
     // ونحاول إعادة الاتصال به دون تدخل المستخدم.
     // P2P — لا يوجد خادم للاتصال به تلقائياً، الجلسة تبدأ عبر QR Code
+
+    // إن كانت هناك جلسة P2P سابقة (حتى لو التطبيق أُغلق بالكامل ثم أُعيد
+    // فتحه) نعرض شريط تذكير يتيح استئنافها بضغطة واحدة بدل البدء من الصفر.
+    try {
+      const lastRole = await getMeta('lastSessionRole');
+      if (lastRole === 'host' || lastRole === 'peer') {
+        showResumeSessionBanner(lastRole);
+      }
+    } catch (metaError) {
+      console.warn('تعذّرت قراءة معلومات الجلسة السابقة (غير حرج):', metaError);
+    }
   } catch (error) {
     console.error('تعذّر فتح قاعدة البيانات المحلية:', error);
     setImportStatus('تعذّر الوصول إلى التخزين المحلي في هذا المتصفح.', 'error');
