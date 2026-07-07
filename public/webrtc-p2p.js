@@ -180,6 +180,31 @@ class DeliveryP2P extends EventTarget {
     return true;
   }
 
+  /* -----------------------------------------------------------------------
+     محاولة استرجاع الاتصال بدون مسح QR (فقط تعمل إن كانت الصفحة نفسها لا
+     تزال حية بالذاكرة — أي أن هذا "تجميد مؤقت" وليس إغلاقاً فعلياً للتطبيق).
+     الجهاز "المضيف" وحده من يملك الصلاحية لبدء ICE restart (نفس منطق من
+     ينشئ Offer أصلاً)؛ الجهاز التابع ينتظر عرض المضيف الجديد تلقائياً.
+     ----------------------------------------------------------------------- */
+  async _attemptIceRestart() {
+    if (this.role !== 'host' || !this.pc || typeof this.pc.restartIce !== 'function') return;
+    try {
+      this.pc.restartIce();
+    } catch (e) {
+      console.warn('تعذّرت محاولة استرجاع الاتصال (ICE restart):', e);
+    }
+  }
+
+  /**
+   * تُستدعى من الواجهة (مثلاً عند عودة التطبيق من الخلفية) لتحفيز محاولة
+   * استرجاع فورية بدل انتظار مهلة السماح كاملة.
+   */
+  tryReconnect() {
+    if (this.pc && this.pc.connectionState && this.pc.connectionState !== 'connected') {
+      this._attemptIceRestart();
+    }
+  }
+
   disconnect() {
     if (this._disconnectGraceTimer) {
       clearTimeout(this._disconnectGraceTimer);
@@ -215,18 +240,21 @@ class DeliveryP2P extends EventTarget {
         this._dispatch('connected', { role: this.role });
 
       } else if (state === 'disconnected') {
-        // "disconnected" غالباً حالة عابرة (تذبذب شبكة مؤقت على هوت سبوت
-        // موبايل مثلاً) وتتعافى تلقائياً خلال ثوانٍ. لا نُعلن انقطاع
-        // الاتصال فوراً؛ ننتظر مهلة سماح قصيرة أولاً — إن لم يتعافَ
-        // الاتصال خلالها نعتبره انقطاعاً حقيقياً عندها فقط.
+        // "disconnected" غالباً حالة عابرة (تصغير التطبيق، قفل الشاشة، أو
+        // تذبذب شبكة مؤقت) وتتعافى تلقائياً أو عبر إعادة تفاوض ICE. لا نُعلن
+        // انقطاع الاتصال فوراً؛ أولاً نحاول "ICE restart" (يُبقي نفس
+        // RTCPeerConnection/DataChannel بدون أي حاجة لمسح QR من جديد، طالما
+        // الصفحة نفسها لم تُغلق فعلياً) — فقط إن فشلت كل المحاولات خلال مهلة
+        // السماح نعتبره انقطاعاً حقيقياً ونطلب جلسة جديدة.
         if (!this._disconnectGraceTimer) {
+          this._attemptIceRestart();
           this._disconnectGraceTimer = setTimeout(() => {
             this._disconnectGraceTimer = null;
             if (this.pc && this.pc.connectionState !== 'connected') {
               this.connected = false;
               this._dispatch('disconnected', { state: this.pc.connectionState });
             }
-          }, 6000);
+          }, 25000); // مهلة أطول (كانت 6 ثوانٍ) لإعطاء فرصة حقيقية للتعافي التلقائي
         }
 
       } else if (['failed', 'closed'].includes(state)) {
