@@ -236,32 +236,8 @@ window.p2pBroadcastReset = () => {
    فنعرض إما بطاقة الجهاز المتصل حالياً أو رسالة "لا يوجد اتصال".
    ----------------------------------------------------------------------- */
 function renderConnectedDevice(peer) {
-  const list = document.getElementById('devicesList');
-  const emptyMsg = document.getElementById('devicesEmptyMsg');
-  const countBadge = document.getElementById('devicesCountBadge');
-  if (!list || !emptyMsg) return;
-
-  if (!peer) {
-    list.innerHTML = '';
-    emptyMsg.classList.remove('hidden');
-    if (countBadge) countBadge.classList.add('hidden');
-    return;
-  }
-
-  emptyMsg.classList.add('hidden');
-  const safeName = document.createElement('div');
-  safeName.textContent = peer.deviceName || 'جهاز غير معروف';
-
-  list.innerHTML = `
-    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/50">
-      <span class="w-2 h-2 rounded-full bg-delivered shrink-0"></span>
-      <span class="font-medium text-sm">${safeName.innerHTML}</span>
-    </li>
-  `;
-  if (countBadge) {
-    countBadge.textContent = '1';
-    countBadge.classList.remove('hidden');
-  }
+  window.__lastKnownPeer = peer || null;
+  window.renderDevicesList?.(peer || null);
 }
 
 /* -----------------------------------------------------------------------
