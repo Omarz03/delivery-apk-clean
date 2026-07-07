@@ -40,8 +40,14 @@ function releaseWakeLock() {
 // Wake Lock يُلغى تلقائياً من المتصفح عند تصغير التطبيق/تبديل التبويب —
 // نعيد طلبه فور عودة الظهور إن كان الاتصال لا يزال نشطاً.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && p2p.connected && !wakeLock) {
-    requestWakeLock();
+  if (document.visibilityState === 'visible') {
+    if (p2p.connected && !wakeLock) {
+      requestWakeLock();
+    }
+    // فور رجوع التطبيق للواجهة، نحفّز محاولة استرجاع فورية بدل انتظار
+    // مهلة السماح الكاملة (25 ثانية) — يفيد تحديداً حين يكون المستخدم
+    // قد أعاد فتح التطبيق قبل انتهاء المهلة.
+    p2p.tryReconnect?.();
   }
 });
 
@@ -91,9 +97,25 @@ p2p.addEventListener('transfer-incomplete', (event) => {
 /* -----------------------------------------------------------------------
    معالجة الرسائل الواردة — نفس نوع الرسائل القديمة لكن بدون خادم
    ----------------------------------------------------------------------- */
-p2p.addEventListener('message', async (event) => {
-  const { type, payload } = event.detail;
+/* -----------------------------------------------------------------------
+   طابور معالجة تسلسلي للرسائل الواردة
+   -------------------------------------------------------------------------
+   بدون هذا الطابور، لو وصلت رسالتان (مثلاً client-data ثم send-all-data)
+   خلال نفس الأجزاء من الثانية، كل واحدة كانت تبدأ تنفيذها فوراً كدالة async
+   منفصلة، وبما أنّ upsertBySyncId تنتظر كتابة IndexedDB (عملية غير متزامنة)،
+   الرسالتان كانتا "تشوفان" أن السجل غير موجود بعد بنفس اللحظة وتضيفانه كل
+   واحدة على حدة → تكرار كل صف مرتين فعلياً. الحل: ننفّذ المعالجات وحدة وحدة
+   بالتسلسل الصارم عبر سلسلة Promise واحدة، فلا تبدأ رسالة قبل اكتمال سابقتها.
+   ----------------------------------------------------------------------- */
+let _messageQueue = Promise.resolve();
 
+p2p.addEventListener('message', (event) => {
+  _messageQueue = _messageQueue
+    .then(() => handleP2PMessage(event.detail))
+    .catch((err) => console.error('خطأ أثناء معالجة رسالة P2P:', err));
+});
+
+async function handleP2PMessage({ type, payload }) {
   switch (type) {
     case 'device-hello': {
       renderConnectedDevice({ deviceId: payload?.deviceId, deviceName: payload?.deviceName });
@@ -180,7 +202,7 @@ p2p.addEventListener('message', async (event) => {
     default:
       console.warn('رسالة P2P غير معروفة:', type);
   }
-});
+}
 
 /* -----------------------------------------------------------------------
    وظائف البث عبر P2P (تُستخدم من script.js بدل socket.emit)
