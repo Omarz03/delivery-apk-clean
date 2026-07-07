@@ -385,6 +385,7 @@ function showToast(message, tone = 'info', duration = 3500) {
     setTimeout(() => toast.remove(), 250);
   }, duration);
 }
+window.showToast = showToast; // مطلوبة من sync-bridge.js (إشعارات الاتصال والمزامنة)
 
 function setImportStatus(message, tone = 'neutral') {
   const colors = {
@@ -1194,31 +1195,80 @@ if ('serviceWorker' in navigator) {
 }
 
 /* -------------------------------------------------------------------------
-   13) اعتراض زر الرجوع (أندرويد) أثناء جلسة نشطة
+   13) اعتراض زر الرجوع (أندرويد) — يتطلب ضغطتين للخروج + تحذير أثناء جلسة نشطة
    -------------------------------------------------------------------------
    الخروج المفاجئ من التطبيق (بالخطأ عبر زر الرجوع) يقطع اتصال WebRTC فوراً
-   لأن الصفحة/JS كلها تُغلق. نعترض الحدث ونطلب تأكيداً صريحاً فقط إن كانت
-   هناك جلسة P2P نشطة فعلاً، وإلا نترك السلوك الافتراضي كما هو تماماً.
+   لأن الصفحة/JS كلها تُغلق. لهذا:
+     - إن كانت هناك جلسة P2P نشطة: نطلب تأكيداً صريحاً دائماً (كما كان).
+     - إن لم تكن هناك جلسة نشطة: بدل الخروج فوراً بضغطة واحدة (سهل الخطأ)،
+       نطلب ضغطة ثانية خلال ثانيتين لتأكيد النية الفعلية بالخروج.
+   نغطي حالتين مختلفتين لأن التطبيق قد يعمل إما كـ APK حقيقي (Capacitor) أو
+   كـ PWA على المتصفح مباشرة (الحالة الحالية عبر GitHub Pages) — وزر الرجوع
+   بالأندرويد يُدار بطريقة مختلفة تماماً بكل حالة.
    ------------------------------------------------------------------------- */
 function setupBackButtonGuard() {
-  // نتحقق فعلياً أننا داخل تطبيق أندرويد أصلي (APK) وليس مجرد وجود stub
-  // ويب وهمي لـ Capacitor (المعرّف في index.html للتوافق على الويب).
-  // isCapacitor وحدها لا تكفي لأن الـ stub يعرّف window.Capacitor دائماً.
-  const isNative = window.Capacitor?.getPlatform?.() !== 'web';
-  const appPlugin = window.Capacitor?.Plugins?.App;
-  if (!isNative || !appPlugin || typeof appPlugin.addListener !== 'function') return;
+  const EXIT_CONFIRM_WINDOW_MS = 2000;
+  let awaitingExitConfirm = false;
+  let exitConfirmTimer = null;
 
-  appPlugin.addListener('backButton', () => {
+  function armExitConfirm() {
+    awaitingExitConfirm = true;
+    window.showToast('اضغط رجوع مرة أخرى للخروج من التطبيق', 'info', EXIT_CONFIRM_WINDOW_MS);
+    clearTimeout(exitConfirmTimer);
+    exitConfirmTimer = setTimeout(() => {
+      awaitingExitConfirm = false;
+    }, EXIT_CONFIRM_WINDOW_MS);
+  }
+
+  // "معالج القرار" المشترك: يُستدعى من أي مصدر (Capacitor أو popstate) عند
+  // ضغطة رجوع واحدة، ويُعيد true إن كان يجب فعلاً الخروج الآن.
+  function shouldExitNow() {
     const sessionActive = window.deliveryP2P?.connected === true;
 
     if (sessionActive) {
-      const confirmed = window.confirm(
+      return window.confirm(
         'في جلسة تسليم نشطة الآن مع جهاز آخر. الخروج سيقطع الاتصال بينكما فوراً. متأكد أنك تريد الخروج؟'
       );
-      if (!confirmed) return; // البقاء بالتطبيق، عدم تنفيذ أي شيء
     }
 
-    appPlugin.exitApp();
+    if (awaitingExitConfirm) {
+      clearTimeout(exitConfirmTimer);
+      awaitingExitConfirm = false;
+      return true; // هذه الضغطة الثانية خلال المهلة — نخرج فعلاً
+    }
+
+    armExitConfirm();
+    return false; // ضغطة أولى فقط — لا نخرج بعد
+  }
+
+  // --- الحالة 1: تطبيق أندرويد أصلي (APK) عبر Capacitor ---
+  // نتحقق فعلياً أننا داخل منصة أصلية وليس مجرد وجود stub ويب وهمي لـ
+  // Capacitor (المعرّف في index.html للتوافق على الويب) — isCapacitor وحدها
+  // لا تكفي لأن الـ stub يعرّف window.Capacitor دائماً.
+  const isNative = window.Capacitor?.getPlatform?.() !== 'web';
+  const appPlugin = window.Capacitor?.Plugins?.App;
+  if (isNative && appPlugin && typeof appPlugin.addListener === 'function') {
+    appPlugin.addListener('backButton', () => {
+      if (shouldExitNow()) appPlugin.exitApp();
+    });
+    return;
+  }
+
+  // --- الحالة 2: PWA/صفحة ويب عادية (الوضع الحالي فعلياً) ---
+  // زر رجوع أندرويد هنا يُترجَم لحدث popstate على تاريخ المتصفح. نضيف حالة
+  // وهمية بالتاريخ عند التحميل؛ كل ضغطة رجوع "تستهلك" هذه الحالة فتُطلق
+  // popstate بدل الخروج مباشرة من الصفحة/التطبيق — فنعترضها هنا ونقرر.
+  history.pushState({ __exitGuard: true }, '');
+  window.addEventListener('popstate', () => {
+    if (shouldExitNow()) {
+      // خروج فعلي: نُرجع خطوة تاريخ إضافية بدل إعادة إدراج الحارس، حتى
+      // تُغلق الصفحة/التبويب فعلاً بدل الدخول بحلقة لا نهائية.
+      history.back();
+      return;
+    }
+    // البقاء بالتطبيق: نعيد إدراج نفس حالة الحارس حتى تبقى الحماية فعّالة
+    // لأي ضغطة رجوع لاحقة.
+    history.pushState({ __exitGuard: true }, '');
   });
 }
 
