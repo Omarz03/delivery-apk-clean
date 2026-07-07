@@ -1201,9 +1201,12 @@ if ('serviceWorker' in navigator) {
    هناك جلسة P2P نشطة فعلاً، وإلا نترك السلوك الافتراضي كما هو تماماً.
    ------------------------------------------------------------------------- */
 function setupBackButtonGuard() {
-  const isCapacitor = typeof window.Capacitor !== 'undefined';
+  // نتحقق فعلياً أننا داخل تطبيق أندرويد أصلي (APK) وليس مجرد وجود stub
+  // ويب وهمي لـ Capacitor (المعرّف في index.html للتوافق على الويب).
+  // isCapacitor وحدها لا تكفي لأن الـ stub يعرّف window.Capacitor دائماً.
+  const isNative = window.Capacitor?.getPlatform?.() !== 'web';
   const appPlugin = window.Capacitor?.Plugins?.App;
-  if (!isCapacitor || !appPlugin) return;
+  if (!isNative || !appPlugin || typeof appPlugin.addListener !== 'function') return;
 
   appPlugin.addListener('backButton', () => {
     const sessionActive = window.deliveryP2P?.connected === true;
@@ -1224,7 +1227,14 @@ function setupBackButtonGuard() {
    ------------------------------------------------------------------------- */
 (async function init() {
   updateConnectionStatus();
-  setupBackButtonGuard();
+
+  // نعزل هذا الاستدعاء بـ try/catch خاص به حتى لا يوقف أي خطأ فيه بقية init
+  // (وتحديداً فتح قاعدة البيانات) — هذا بالضبط ما كان يحدث سابقاً.
+  try {
+    setupBackButtonGuard();
+  } catch (guardError) {
+    console.warn('تعذّر تفعيل حارس زر الرجوع (غير حرج):', guardError);
+  }
 
   try {
     db = await openDatabase();
