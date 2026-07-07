@@ -254,6 +254,24 @@ function normalizeIdValue(value) {
 }
 
 /**
+ * تجزئة نصية بسيطة وحتمية (FNV-1a 32-bit): نفس المُدخل ينتج نفس المُخرج
+ * دائماً، على أي جهاز وفي أي وقت. تُستخدم كمعرّف مزامنة احتياطي (__syncId)
+ * عندما لا يتوفر عمود هوية موثوق لصف معيّن — بدل معرّف عشوائي، حتى لا
+ * تتكرر بيانات الشخص نفسه لو استُورد نفس الملف من جهاز آخر بشكل منفصل.
+ * (تنازل واعٍ: لو صفّان مختلفان تماماً تطابقا بكل القيم بالحرف، سيُعامَلان
+ * كسجل واحد — احتمال نادر جداً، ومفضّل على تكرار بيانات الشخص نفسه بصمت.)
+ */
+function hashRowContent(row, columns) {
+  const content = columns.map((col) => normalizeIdValue(row[col])).join('|');
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < content.length; i++) {
+    hash ^= content.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/**
  * محاولة اكتشاف عمود "المعرّف الفريد" (مثل رقم الهوية) تلقائياً من بين
  * أعمدة الملف المستورد: نفضّل عموداً باسم يوحي بذلك (هوية، رقم وطني...)
  * وتكون قيمه شبه فريدة عبر كل الصفوف (95%+). إن لم نجد عموداً مناسباً
@@ -519,12 +537,15 @@ async function finalizeImport(rows, columns, identifierColumn, fileName) {
         seenKeys.add(key);
         syncId = `key:${identifierColumn}:${key}`;
       } else {
-        // قيمة فارغة أو مكررة داخل نفس الملف — لا يمكن الاعتماد عليها كمعرّف فريد لهذا الصف
+        // قيمة فارغة أو مكررة داخل نفس الملف — لا يمكن الاعتماد عليها كمعرّف
+        // فريد لهذا الصف، فنلجأ لمعرّف حتمي مبني على محتوى الصف بالكامل
+        // (بدل معرّف عشوائي) حتى لا تتكرر بيانات هذا الشخص لو استُورد نفس
+        // الملف من جهاز آخر بشكل منفصل.
         usedFallbackIds.push(index + 2); // +2 لتقريب رقم الصف كما يظهر في إكسل (يشمل صف العناوين)
-        syncId = generateSyncId();
+        syncId = `content:${hashRowContent(row, columns)}`;
       }
     } else {
-      syncId = generateSyncId();
+      syncId = `content:${hashRowContent(row, columns)}`;
     }
 
     return {
@@ -1173,10 +1194,37 @@ if ('serviceWorker' in navigator) {
 }
 
 /* -------------------------------------------------------------------------
-   13) نقطة البداية: فتح القاعدة، تحميل البيانات المحفوظة سابقاً، وعرضها
+   13) اعتراض زر الرجوع (أندرويد) أثناء جلسة نشطة
+   -------------------------------------------------------------------------
+   الخروج المفاجئ من التطبيق (بالخطأ عبر زر الرجوع) يقطع اتصال WebRTC فوراً
+   لأن الصفحة/JS كلها تُغلق. نعترض الحدث ونطلب تأكيداً صريحاً فقط إن كانت
+   هناك جلسة P2P نشطة فعلاً، وإلا نترك السلوك الافتراضي كما هو تماماً.
+   ------------------------------------------------------------------------- */
+function setupBackButtonGuard() {
+  const isCapacitor = typeof window.Capacitor !== 'undefined';
+  const appPlugin = window.Capacitor?.Plugins?.App;
+  if (!isCapacitor || !appPlugin) return;
+
+  appPlugin.addListener('backButton', () => {
+    const sessionActive = window.deliveryP2P?.connected === true;
+
+    if (sessionActive) {
+      const confirmed = window.confirm(
+        'في جلسة تسليم نشطة الآن مع جهاز آخر. الخروج سيقطع الاتصال بينكما فوراً. متأكد أنك تريد الخروج؟'
+      );
+      if (!confirmed) return; // البقاء بالتطبيق، عدم تنفيذ أي شيء
+    }
+
+    appPlugin.exitApp();
+  });
+}
+
+/* -------------------------------------------------------------------------
+   14) نقطة البداية: فتح القاعدة، تحميل البيانات المحفوظة سابقاً، وعرضها
    ------------------------------------------------------------------------- */
 (async function init() {
   updateConnectionStatus();
+  setupBackButtonGuard();
 
   try {
     db = await openDatabase();
