@@ -89,6 +89,7 @@ class DeliveryP2P extends EventTarget {
     this.role = null;         // 'host' أو 'peer'
     this.connected = false;
     this._receiveBuffer = ''; // بافر لتجميع chunks الرسائل الكبيرة
+    this._disconnectGraceTimer = null; // مهلة سماح قبل إعلان انقطاع حقيقي
   }
 
   /* -----------------------------------------------------------------------
@@ -180,6 +181,10 @@ class DeliveryP2P extends EventTarget {
   }
 
   disconnect() {
+    if (this._disconnectGraceTimer) {
+      clearTimeout(this._disconnectGraceTimer);
+      this._disconnectGraceTimer = null;
+    }
     if (this.dc) { try { this.dc.close(); } catch {} }
     if (this.pc) { try { this.pc.close(); } catch {} }
     this.dc = null;
@@ -199,10 +204,37 @@ class DeliveryP2P extends EventTarget {
 
     this.pc.onconnectionstatechange = () => {
       const state = this.pc.connectionState;
+
       if (state === 'connected') {
+        // اتصال ناجح (أو تعافى من تذبذب مؤقت) — نلغي أي مهلة سماح معلّقة
+        if (this._disconnectGraceTimer) {
+          clearTimeout(this._disconnectGraceTimer);
+          this._disconnectGraceTimer = null;
+        }
         this.connected = true;
         this._dispatch('connected', { role: this.role });
-      } else if (['disconnected', 'failed', 'closed'].includes(state)) {
+
+      } else if (state === 'disconnected') {
+        // "disconnected" غالباً حالة عابرة (تذبذب شبكة مؤقت على هوت سبوت
+        // موبايل مثلاً) وتتعافى تلقائياً خلال ثوانٍ. لا نُعلن انقطاع
+        // الاتصال فوراً؛ ننتظر مهلة سماح قصيرة أولاً — إن لم يتعافَ
+        // الاتصال خلالها نعتبره انقطاعاً حقيقياً عندها فقط.
+        if (!this._disconnectGraceTimer) {
+          this._disconnectGraceTimer = setTimeout(() => {
+            this._disconnectGraceTimer = null;
+            if (this.pc && this.pc.connectionState !== 'connected') {
+              this.connected = false;
+              this._dispatch('disconnected', { state: this.pc.connectionState });
+            }
+          }, 6000);
+        }
+
+      } else if (['failed', 'closed'].includes(state)) {
+        // انقطاع حاسم ومؤكد — لا داعي لانتظار أي مهلة سماح
+        if (this._disconnectGraceTimer) {
+          clearTimeout(this._disconnectGraceTimer);
+          this._disconnectGraceTimer = null;
+        }
         this.connected = false;
         this._dispatch('disconnected', { state });
       }
