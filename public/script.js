@@ -406,9 +406,9 @@ function renderDevicesList(peer) {
   el.devicesEmptyMsg.classList.add('hidden'); // جهازك نفسه موجود بالقائمة دائماً
 
   const selfItem = `
-    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pine/5 border border-line">
+    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pine/10 border border-line">
       <span class="w-2 h-2 rounded-full bg-clay shrink-0"></span>
-      <span class="font-medium text-sm flex-1 truncate">${escapeHtml(deviceName || 'هذا الجهاز')} <span class="text-ink/40 font-normal">(أنت)</span></span>
+      <span class="font-medium text-sm flex-1 overflow-hidden whitespace-nowrap">${escapeHtml(deviceName || 'هذا الجهاز')} <span class="text-ink/40">(أنت)</span></span>
       <button onclick="window.renameThisDevice?.()" class="text-ink/40 hover:text-ink p-1 rounded-lg shrink-0" aria-label="تعديل اسمك" title="تعديل اسمك الظاهر لبقية الأجهزة">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       </button>
@@ -417,9 +417,9 @@ function renderDevicesList(peer) {
 
   const peerItem = peer
     ? `
-    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/50">
+    <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/70">
       <span class="w-2 h-2 rounded-full bg-delivered shrink-0"></span>
-      <span class="font-medium text-sm truncate">${escapeHtml(peer.deviceName || 'جهاز غير معروف')}</span>
+      <span class="font-medium text-sm overflow-hidden whitespace-nowrap">${escapeHtml(peer.deviceName || 'جهاز غير معروف')}</span>
     </li>
   `
     : '';
@@ -530,8 +530,8 @@ function showResumeSessionBanner(role) {
   banner.innerHTML = `
     <span class="text-sm font-medium">كان عندك جلسة تسليم سابقة (${role === 'host' ? 'كمضيف' : 'كتابع'}) — هل تريد استئنافها؟</span>
     <div class="flex items-center gap-2 shrink-0">
-      <button id="resumeSessionBtn" class="bg-white/20 hover:bg-white/30 transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">استئناف</button>
-      <button id="dismissResumeBtn" class="text-white/70 hover:text-white px-2 py-1.5 text-sm" aria-label="تجاهل">✕</button>
+      <button id="resumeSessionBtn" class="bg-white text-clay hover:bg-paper transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">استئناف</button>
+      <button id="dismissResumeBtn" class="text-white px-2 py-1.5 text-sm" aria-label="تجاهل">✕</button>
     </div>
   `;
   document.body.prepend(banner);
@@ -1088,7 +1088,7 @@ function setStatusFilter(key) {
   currentStatusFilter = statusFilterMap[key] ?? null;
   document.querySelectorAll('.status-filter-btn').forEach((btn) => {
     const isActive = btn.dataset.statusFilter === key;
-    btn.className = `status-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+    btn.className = `status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
       isActive ? 'bg-pine text-white' : 'text-ink/55 hover:bg-paper hover:text-ink'
     }`;
   });
@@ -1334,7 +1334,7 @@ function renderAppendixForm() {
   const editableColumns = allColumns.slice(1);
 
   const numberNote = numberColumn
-    ? `<p class="text-xs text-ink/40 -mt-1 mb-1">"${escapeHtml(numberColumn)}" سيُحدَّد تلقائياً (ترقيم تسلسلي)</p>`
+    ? `<p class="text-xs text-ink/40 mb-1">"${escapeHtml(numberColumn)}" سيُحدَّد تلقائياً (ترقيم تسلسلي)</p>`
     : '';
 
   el.appendixFormFields.innerHTML =
