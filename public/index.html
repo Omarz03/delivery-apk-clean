@@ -167,7 +167,7 @@
 
       <!-- وضع استيراد ملف Excel -->
       <div id="appendixExcelView" class="hidden">
-        <p class="text-xs text-ink/50 mb-4">يجب أن يحتوي الملف على نفس أعمدة الجلسة الحالية (بنفس الأسماء). أي عمود ناقص سيُترك فارغاً، وأي عمود زائد غير معروف سيُتجاهل.</p>
+        <p class="text-xs text-ink/50 mb-3">يجب أن يحتوي الملف على نفس أعمدة الجلسة الحالية (بنفس الأسماء). أي عمود ناقص سيُترك فارغاً، وأي عمود زائد غير معروف سيُتجاهل.</p>
         <button id="appendixTemplateBtn" type="button" class="w-full flex items-center justify-center gap-2 bg-paper hover:bg-line/40 transition-colors text-ink/70 font-medium text-sm py-2.5 rounded-xl border border-line mb-5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
           تحميل نموذج فارغ بنفس الأعمدة
@@ -323,6 +323,13 @@
         <button id="clearSearchBtn" class="hidden shrink-0 h-10 w-10 flex items-center justify-center bg-white border border-line rounded-xl text-ink/40 hover:text-pending hover:border-pending/40 transition-colors" title="مسح البحث">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
+      </div>
+
+      <!-- تصفية حسب حالة الاستلام -->
+      <div id="statusFilterBar" class="flex items-center gap-1.5 bg-paper rounded-xl p-1 w-fit">
+        <button data-status-filter="all" class="status-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-white text-pine shadow-sm">الكل</button>
+        <button data-status-filter="delivered" class="status-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors text-ink/50">تم الاستلام</button>
+        <button data-status-filter="pending" class="status-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors text-ink/50">لم يتم الاستلام</button>
       </div>
 
       <!-- جدول البيانات -->
