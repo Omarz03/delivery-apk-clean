@@ -37,6 +37,50 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
+/* -----------------------------------------------------------------------
+   منع "اسحب للتحديث" (Pull-to-refresh) أثناء وجود جلسة P2P نشطة فقط
+   -------------------------------------------------------------------------
+   على أندرويد/كروم، السحب لأسفل من أعلى الصفحة يُعيد تحميلها بالكامل —
+   وهذا يُغلق اتصال WebRTC فوراً (نفس أثر إغلاق التطبيق). أغلب هذه الحالات
+   تصير بالخطأ أثناء التمرير العادي بالجدول. نمنعها فقط أثناء اتصال نشط
+   فعلاً (لا داعي لمنعها وقت عدم الاتصال، فالتحديث حينها غير ضار). نعتمد
+   أساساً على مستوى اللمس (أدق وأكثر توافقاً) مع overscroll-behavior
+   كطبقة حماية إضافية غير حرجة.
+   ----------------------------------------------------------------------- */
+let pullToRefreshTouchStartY = 0;
+
+document.addEventListener(
+  'touchstart',
+  (event) => {
+    pullToRefreshTouchStartY = event.touches[0]?.clientY ?? 0;
+  },
+  { passive: true }
+);
+
+document.addEventListener(
+  'touchmove',
+  (event) => {
+    if (!p2p.connected) return; // غير متصل حالياً — نسمح بالسحب/التحديث العادي
+
+    const touchY = event.touches[0]?.clientY ?? 0;
+    const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+    // نمنع فقط السحب لأسفل وأنت أصلاً بأعلى الصفحة (نفس الشرط الذي يُظهر
+    // مؤشر "اسحب للتحديث" أساساً) — لا نمنع أي تمرير عادي داخل الجدول.
+    if (scrollTop <= 0 && touchY > pullToRefreshTouchStartY) {
+      event.preventDefault();
+    }
+  },
+  { passive: false } // passive:false إلزامي حتى يعمل preventDefault فعلياً
+);
+
+function updatePullToRefreshCssGuard() {
+  document.documentElement.style.overscrollBehaviorY = p2p.connected ? 'contain' : 'auto';
+}
+
+p2p.addEventListener('channel-open', updatePullToRefreshCssGuard);
+p2p.addEventListener('channel-closed', updatePullToRefreshCssGuard);
+p2p.addEventListener('disconnected', updatePullToRefreshCssGuard);
+
 // Wake Lock يُلغى تلقائياً من المتصفح عند تصغير التطبيق/تبديل التبويب —
 // نعيد طلبه فور عودة الظهور إن كان الاتصال لا يزال نشطاً.
 document.addEventListener('visibilitychange', () => {
