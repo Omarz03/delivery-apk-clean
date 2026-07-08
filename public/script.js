@@ -193,6 +193,7 @@ const el = {
   statusLabel: document.getElementById('statusLabel'),
   receiverInput: document.getElementById('receiverInput'),
   notesInput: document.getElementById('notesInput'),
+  deliveryAttribution: document.getElementById('deliveryAttribution'),
   syncDot: document.getElementById('syncDot'),
   syncLabel: document.getElementById('syncLabel'),
   syncMessage: document.getElementById('syncMessage'),
@@ -953,6 +954,26 @@ el.searchInput.addEventListener('input', (event) => {
    8) النافذة الجانبية (Drawer): عرض التفاصيل وتعديل الحالة
    ------------------------------------------------------------------------- */
 
+/**
+ * يعرض جملة "تم التسليم في [الوقت] من خلال المستخدم [الاسم]" أسفل مفتاح
+ * حالة الاستلام مباشرة، أثناء الجلسة نفسها (وليس فقط بالتقرير المُصدَّر
+ * لاحقاً). تُخفى الجملة كلياً إن لم يكن السجل مُسلَّماً بعد.
+ */
+function renderDeliveryAttribution(record) {
+  if (!el.deliveryAttribution) return;
+
+  if (!record?.__status || !record.__deliveredAt) {
+    el.deliveryAttribution.classList.add('hidden');
+    el.deliveryAttribution.textContent = '';
+    return;
+  }
+
+  const time = formatDeliveryTimestamp(record.__deliveredAt);
+  const name = record.__deliveredByName || 'غير معروف';
+  el.deliveryAttribution.textContent = `تم التسليم في ${time} من خلال المستخدم ${name}`;
+  el.deliveryAttribution.classList.remove('hidden');
+}
+
 function openDrawer(id) {
   const record = allRecords.find((r) => r.id === id);
   if (!record) return;
@@ -973,6 +994,7 @@ function openDrawer(id) {
   setStatusToggle(Boolean(record.__status));
   el.receiverInput.value = record.__receiver || '';
   el.notesInput.value = record.__notes || '';
+  renderDeliveryAttribution(record);
 
   el.drawer.classList.add('open');
   el.drawer.setAttribute('aria-hidden', 'false');
@@ -1002,7 +1024,19 @@ function setStatusToggle(checked) {
 
 el.statusToggle.addEventListener('click', () => {
   const currentlyChecked = el.statusToggle.dataset.checked === 'true';
-  setStatusToggle(!currentlyChecked);
+  const nextChecked = !currentlyChecked;
+  setStatusToggle(nextChecked);
+
+  // معاينة حية لسطر "تم التسليم..." فور التبديل، قبل الحفظ الفعلي حتى —
+  // حتى يشوف المستخدم النتيجة أثناء التسليم مباشرة وليس بعد إغلاق النافذة.
+  const record = allRecords.find((r) => r.id === openRecordId);
+  if (!nextChecked) {
+    renderDeliveryAttribution(null);
+  } else if (record?.__deliveredAt) {
+    renderDeliveryAttribution(record); // كان مُسلَّماً أصلاً بنفس هذه الجلسة — نُبقي بياناته
+  } else {
+    renderDeliveryAttribution({ __status: true, __deliveredAt: Date.now(), __deliveredByName: deviceName });
+  }
 });
 
 el.drawerClose.addEventListener('click', closeDrawer);
@@ -1034,15 +1068,11 @@ el.drawerSave.addEventListener('click', async () => {
   const statusChecked = el.statusToggle.dataset.checked === 'true';
   let receiverValue = el.receiverInput.value.trim();
 
-  // لو تُرك اسم المستلم فاضياً، نعبّئه تلقائياً باسم المستفيد نفسه (من عمود
-  // الاسم المكتشف بالبيانات الأصلية، مع مراعاة أي تعديل عليه بنفس الحفظة).
+  // لو تُرك اسم المستلم فاضياً، نعتبره استلمه المستفيد نفسه (بدل تكرار اسمه
+  // الكامل تلقائياً — القيمة الثابتة "نفسه" أوضح وأسرع قراءة بالتقرير).
   if (!receiverValue) {
-    const nameCol = detectNameColumn(allColumns);
-    const beneficiaryName = nameCol ? (updatedFieldValues[nameCol] ?? record[nameCol]) : null;
-    if (beneficiaryName) {
-      receiverValue = String(beneficiaryName).trim();
-      el.receiverInput.value = receiverValue; // انعكاس فوري بالحقل بالواجهة
-    }
+    receiverValue = 'نفسه';
+    el.receiverInput.value = receiverValue; // انعكاس فوري بالحقل بالواجهة
   }
 
   const updated = {
