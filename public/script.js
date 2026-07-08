@@ -222,6 +222,7 @@ const el = {
   identifierSkipBtn: document.getElementById('identifierSkipBtn'),
   appendixFilterBtn: document.getElementById('appendixFilterBtn'),
   statusFilterCount: document.getElementById('statusFilterCount'),
+  statusFilterClearBtn: document.getElementById('statusFilterClearBtn'),
   // نافذة "إضافة ملحق"
   appendixBtn: document.getElementById('appendixBtn'),
   appendixModal: document.getElementById('appendixModal'),
@@ -1106,10 +1107,18 @@ function updateStatusFilterBar(count) {
     }
   }
 
+  if (el.statusFilterClearBtn) {
+    const isFiltered = currentStatusFilter !== null;
+    el.statusFilterClearBtn.classList.toggle('hidden', !isFiltered);
+    el.statusFilterClearBtn.classList.toggle('inline-flex', isFiltered);
+  }
+
   if (el.statusFilterCount) {
     el.statusFilterCount.textContent = String(count);
   }
 }
+
+el.statusFilterClearBtn?.addEventListener('click', () => setStatusFilter('all'));
 
 function setStatusFilter(key) {
   currentStatusFilter = statusFilterMap[key] ?? null;
@@ -1706,25 +1715,25 @@ if ('serviceWorker' in navigator) {
 }
 
 /* -------------------------------------------------------------------------
-   13) اعتراض زر الرجوع (أندرويد) — يتطلب ضغطتين للخروج + تحذير أثناء جلسة نشطة
+   13) اعتراض زر الرجوع (أندرويد) — لا يُغلق التطبيق إطلاقاً
    -------------------------------------------------------------------------
    الخروج المفاجئ من التطبيق (بالخطأ عبر زر الرجوع) يقطع اتصال WebRTC فوراً
-   لأن الصفحة/JS كلها تُغلق. لهذا:
-     - إن كانت هناك جلسة P2P نشطة: نطلب تأكيداً صريحاً دائماً (كما كان).
-     - إن لم تكن هناك جلسة نشطة: بدل الخروج فوراً بضغطة واحدة (سهل الخطأ)،
-       نطلب ضغطة ثانية خلال ثانيتين لتأكيد النية الفعلية بالخروج.
+   لأن الصفحة/JS كلها تُغلق. بعد ملاحظة أن هذا يصير كثيراً بالخطأ أثناء
+   الاستخدام الفعلي، قررنا تعطيل الخروج عبر زر الرجوع نهائياً: هو فقط يُغلق
+   أي قائمة/نافذة مفتوحة (كأنه ضغط "إلغاء" أو ×)، وإلا لا يفعل شيئاً. الخروج
+   الفعلي الوحيد المتاح صار عبر زر الرئيسية (Home) أو سحب التطبيق من قائمة
+   التطبيقات الأخيرة — وهذان مساران يديرهما النظام مباشرة، خارج تحكم الصفحة،
+   فلا حاجة لأي منطق إضافي لهما هنا.
    نغطي حالتين مختلفتين لأن التطبيق قد يعمل إما كـ APK حقيقي (Capacitor) أو
    كـ PWA على المتصفح مباشرة (الحالة الحالية عبر GitHub Pages) — وزر الرجوع
    بالأندرويد يُدار بطريقة مختلفة تماماً بكل حالة.
    ------------------------------------------------------------------------- */
 function setupBackButtonGuard() {
-  const EXIT_CONFIRM_WINDOW_MS = 2000;
+  let hasShownBackButtonHint = false;
 
   /**
    * تتحقق من أي قائمة جانبية/نافذة مفتوحة حالياً وتسكرها (بمثابة الضغط على
-   * "إلغاء" أو ×)، وتُعيد true إن كانت أغلقت شيئاً فعلاً. هذا يمنع إغلاق
-   * التطبيق بالكامل بالخطأ فقط لأن المستخدم كان يقصد يسكر قائمة مفتوحة —
-   * وهو من أكثر أسباب الخروج غير المقصود شيوعاً كما لوحظ فعلياً بالاستخدام.
+   * "إلغاء" أو ×)، وتُعيد true إن كانت أغلقت شيئاً فعلاً.
    * الترتيب مهم: نتحقق من الأعمق (نافذة QR) قبل الأسطح الأبعد.
    */
   function closeTopmostOverlay() {
@@ -1758,40 +1767,21 @@ function setupBackButtonGuard() {
     }
     return false;
   }
-  let awaitingExitConfirm = false;
-  let exitConfirmTimer = null;
-
-  function armExitConfirm() {
-    awaitingExitConfirm = true;
-    window.showToast('اضغط رجوع مرة أخرى للخروج من التطبيق', 'info', EXIT_CONFIRM_WINDOW_MS);
-    clearTimeout(exitConfirmTimer);
-    exitConfirmTimer = setTimeout(() => {
-      awaitingExitConfirm = false;
-    }, EXIT_CONFIRM_WINDOW_MS);
-  }
 
   // "معالج القرار" المشترك: يُستدعى من أي مصدر (Capacitor أو popstate) عند
-  // ضغطة رجوع واحدة، ويُعيد true إن كان يجب فعلاً الخروج الآن.
-  function shouldExitNow() {
-    // أولوية قصوى: أي قائمة/نافذة مفتوحة تُغلق بدل اعتبار الضغطة محاولة خروج.
-    if (closeTopmostOverlay()) return false;
+  // ضغطة رجوع واحدة. يُغلق أي نافذة مفتوحة إن وُجدت، وإلا ينبّه المستخدم
+  // (مرة واحدة فقط بكل جلسة استخدام) أن الخروج صار فقط عبر الرئيسية.
+  function handleBackPress() {
+    if (closeTopmostOverlay()) return;
 
-    const sessionActive = window.deliveryP2P?.connected === true;
-
-    if (sessionActive) {
-      return window.confirm(
-        'في جلسة تسليم نشطة الآن مع جهاز آخر. الخروج سيقطع الاتصال بينكما فوراً. متأكد أنك تريد الخروج؟'
+    if (!hasShownBackButtonHint) {
+      hasShownBackButtonHint = true;
+      window.showToast(
+        'زر الرجوع لا يُغلق التطبيق — استخدم زر الرئيسية للخروج',
+        'info',
+        3000
       );
     }
-
-    if (awaitingExitConfirm) {
-      clearTimeout(exitConfirmTimer);
-      awaitingExitConfirm = false;
-      return true; // هذه الضغطة الثانية خلال المهلة — نخرج فعلاً
-    }
-
-    armExitConfirm();
-    return false; // ضغطة أولى فقط — لا نخرج بعد
   }
 
   // --- الحالة 1: تطبيق أندرويد أصلي (APK) عبر Capacitor ---
@@ -1801,26 +1791,18 @@ function setupBackButtonGuard() {
   const isNative = window.Capacitor?.getPlatform?.() !== 'web';
   const appPlugin = window.Capacitor?.Plugins?.App;
   if (isNative && appPlugin && typeof appPlugin.addListener === 'function') {
-    appPlugin.addListener('backButton', () => {
-      if (shouldExitNow()) appPlugin.exitApp();
-    });
+    appPlugin.addListener('backButton', handleBackPress);
     return;
   }
 
   // --- الحالة 2: PWA/صفحة ويب عادية (الوضع الحالي فعلياً) ---
   // زر رجوع أندرويد هنا يُترجَم لحدث popstate على تاريخ المتصفح. نضيف حالة
   // وهمية بالتاريخ عند التحميل؛ كل ضغطة رجوع "تستهلك" هذه الحالة فتُطلق
-  // popstate بدل الخروج مباشرة من الصفحة/التطبيق — فنعترضها هنا ونقرر.
+  // popstate، ونعيد إدراجها فوراً دائماً — فلا تصل الضغطة أبداً لإغلاق
+  // الصفحة الفعلي (لا يوجد مسار "خروج" هنا إطلاقاً بعد الآن).
   history.pushState({ __exitGuard: true }, '');
   window.addEventListener('popstate', () => {
-    if (shouldExitNow()) {
-      // خروج فعلي: نُرجع خطوة تاريخ إضافية بدل إعادة إدراج الحارس، حتى
-      // تُغلق الصفحة/التبويب فعلاً بدل الدخول بحلقة لا نهائية.
-      history.back();
-      return;
-    }
-    // البقاء بالتطبيق: نعيد إدراج نفس حالة الحارس حتى تبقى الحماية فعّالة
-    // لأي ضغطة رجوع لاحقة.
+    handleBackPress();
     history.pushState({ __exitGuard: true }, '');
   });
 }
