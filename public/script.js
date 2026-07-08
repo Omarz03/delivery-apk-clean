@@ -220,6 +220,8 @@ const el = {
   identifierColumnsList: document.getElementById('identifierColumnsList'),
   identifierConfirmBtn: document.getElementById('identifierConfirmBtn'),
   identifierSkipBtn: document.getElementById('identifierSkipBtn'),
+  appendixFilterBtn: document.getElementById('appendixFilterBtn'),
+  statusFilterCount: document.getElementById('statusFilterCount'),
   // نافذة "إضافة ملحق"
   appendixBtn: document.getElementById('appendixBtn'),
   appendixModal: document.getElementById('appendixModal'),
@@ -954,7 +956,9 @@ function getFilteredRecords() {
 
   let filtered = allRecords;
 
-  if (currentStatusFilter !== null) {
+  if (currentStatusFilter === 'appendix') {
+    filtered = filtered.filter((record) => record.__isAppendix === true);
+  } else if (currentStatusFilter !== null) {
     filtered = filtered.filter((record) => record.__status === currentStatusFilter);
   }
 
@@ -971,6 +975,7 @@ function getFilteredRecords() {
 function renderTableRows() {
   const filtered = getFilteredRecords();
   el.noResults.classList.toggle('hidden', filtered.length !== 0);
+  updateStatusFilterBar(filtered.length);
 
   el.tableBody.innerHTML = filtered
     .map((record) => {
@@ -1082,15 +1087,38 @@ el.searchInput.addEventListener('input', (event) => {
 /* -------------------------------------------------------------------------
    تصفية حسب حالة الاستلام (الكل / تم الاستلام / لم يتم الاستلام)
    ------------------------------------------------------------------------- */
-const statusFilterMap = { all: null, delivered: true, pending: false };
+const statusFilterMap = { all: null, delivered: true, pending: false, appendix: 'appendix' };
+
+/**
+ * تُستدعى مع كل عرض للجدول: تُظهر/تُخفي زر تصفية "ملحق" حسب وجود سجلات
+ * ملحق فعلاً بالبيانات الحالية، وتحدّث عداد نتائج التصفية أقصى يسار الشريط.
+ */
+function updateStatusFilterBar(count) {
+  const hasAppendix = allRecords.some((r) => r.__isAppendix === true);
+
+  if (el.appendixFilterBtn) {
+    el.appendixFilterBtn.classList.toggle('hidden', !hasAppendix);
+    // لو اختفى آخر سجل ملحق بينما فلتر "ملحق" هو المُفعّل حالياً، نرجع
+    // تلقائياً لفلتر "الكل" حتى لا يبقى الجدول عالقاً بحالة فارغة دائمة.
+    if (!hasAppendix && currentStatusFilter === 'appendix') {
+      setStatusFilter('all');
+      return; // setStatusFilter تنادي renderTableRows من جديد وتحدّث العداد بنفسها
+    }
+  }
+
+  if (el.statusFilterCount) {
+    el.statusFilterCount.textContent = String(count);
+  }
+}
 
 function setStatusFilter(key) {
   currentStatusFilter = statusFilterMap[key] ?? null;
   document.querySelectorAll('.status-filter-btn').forEach((btn) => {
     const isActive = btn.dataset.statusFilter === key;
+    const wasHidden = btn.classList.contains('hidden'); // نحافظ على إخفاء زر "ملحق" إن لم تتوفر سجلات ملحق
     btn.className = `status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
       isActive ? 'bg-pine text-white' : 'text-ink/55 hover:bg-paper hover:text-ink'
-    }`;
+    }${wasHidden ? ' hidden' : ''}`;
   });
   renderTableRows();
 }
