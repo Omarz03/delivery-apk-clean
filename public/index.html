@@ -168,11 +168,11 @@
       <!-- وضع استيراد ملف Excel -->
       <div id="appendixExcelView" class="hidden">
         <p class="text-xs text-ink/50 mb-4">يجب أن يحتوي الملف على نفس أعمدة الجلسة الحالية (بنفس الأسماء). أي عمود ناقص سيُترك فارغاً، وأي عمود زائد غير معروف سيُتجاهل.</p>
-        <button id="appendixTemplateBtn" type="button" class="w-full flex items-center justify-center gap-2 bg-paper hover:bg-line/40 transition-colors text-ink/70 font-medium text-sm py-2.5 rounded-xl border border-line mb-5">
+        <button id="appendixTemplateBtn" type="button" class="w-full flex items-center justify-center gap-2 hover:bg-paper transition-colors text-ink/60 font-medium text-sm py-2.5 rounded-xl border border-line mb-5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
           تحميل نموذج فارغ بنفس الأعمدة
         </button>
-        <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl py-8 cursor-pointer hover:border-clay/60 transition-colors">
+        <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl py-6 cursor-pointer hover:border-clay/60 transition-colors">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-ink/40"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
           <span class="text-sm font-medium text-ink/60">اضغط لاختيار ملف Excel</span>
           <input id="appendixFileInput" type="file" accept=".xlsx,.xls" class="hidden" />
@@ -323,6 +323,13 @@
         <button id="clearSearchBtn" class="hidden shrink-0 h-10 w-10 flex items-center justify-center bg-white border border-line rounded-xl text-ink/40 hover:text-pending hover:border-pending/40 transition-colors" title="مسح البحث">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
+      </div>
+
+      <!-- تصفية حسب حالة الاستلام -->
+      <div id="statusFilterBar" class="inline-flex items-center gap-1.5 bg-white border border-line rounded-xl p-1 shadow-sm">
+        <button data-status-filter="all" class="status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-pine text-white">الكل</button>
+        <button data-status-filter="delivered" class="status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors text-ink/55 hover:bg-paper hover:text-ink">تم الاستلام</button>
+        <button data-status-filter="pending" class="status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors text-ink/55 hover:bg-paper hover:text-ink">لم يتم الاستلام</button>
       </div>
 
       <!-- جدول البيانات -->
