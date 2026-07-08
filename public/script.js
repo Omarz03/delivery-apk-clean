@@ -699,10 +699,25 @@ function buildAppendixSyncId(row, columns, identifierColumn, existingSyncIds) {
  * الفردية ومسار استيراد ملف Excel كملحق.
  * @param {Array<Object>} rawRows صفوف خام (مفاتيحها = أسماء الأعمدة)
  */
+/** يحسب أعلى قيمة رقمية موجودة حالياً بعمود الترقيم، ليبدأ الملحق بعدها مباشرة. */
+function getNextAppendixNumber(numberColumn) {
+  let max = 0;
+  allRecords.forEach((r) => {
+    const n = Number(String(r[numberColumn] ?? '').trim());
+    if (Number.isFinite(n) && n > max) max = n;
+  });
+  return max + 1;
+}
+
 async function addAppendixRecords(rawRows) {
   if (!rawRows.length) return { added: 0, skipped: 0 };
 
   const identifierColumn = (await getMeta('identifierColumn')) || null;
+  // العمود الأول غالباً ما يكون عمود الترقيم التسلسلي بالملف الأصلي — نولّده
+  // تلقائياً لسجلات الملحق بدل الاعتماد على إدخال يدوي (أو قيمة الملف
+  // المستورَد إن وُجدت)، حتى يبقى الترقيم متسلسلاً وصحيحاً دائماً.
+  const numberColumn = allColumns[0] || null;
+  let nextNumber = numberColumn ? getNextAppendixNumber(numberColumn) : null;
   const existingSyncIds = new Set(allRecords.map((r) => r.__syncId));
   const now = Date.now();
   let skipped = 0;
@@ -715,10 +730,15 @@ async function addAppendixRecords(rawRows) {
     allColumns.forEach((col) => {
       normalizedRow[col] = row[col] ?? '';
     });
+    if (numberColumn) {
+      normalizedRow[numberColumn] = nextNumber;
+      nextNumber += 1;
+    }
 
     const syncId = buildAppendixSyncId(normalizedRow, allColumns, identifierColumn, existingSyncIds);
     if (existingSyncIds.has(syncId)) {
       skipped += 1; // نفس الشخص مضاف مسبقاً (نفس عمود المعرّف) — نتجاهله بدل تكراره
+      if (numberColumn) nextNumber -= 1; // نتراجع عن الرقم حتى لا تظهر فجوة بالترقيم
       continue;
     }
     existingSyncIds.add(syncId);
@@ -1274,20 +1294,35 @@ function setAppendixMode(mode) {
 
 /** يبني حقول نموذج الإضافة الفردية ديناميكياً حسب أعمدة الجلسة الحالية. */
 function renderAppendixForm() {
-  el.appendixFormFields.innerHTML = allColumns
-    .map(
-      (col) => `
+  // العمود الأول (عمود الترقيم غالباً) لا يظهر كحقل إدخال — يُحدَّد تلقائياً
+  const numberColumn = allColumns[0];
+  const editableColumns = allColumns.slice(1);
+
+  const numberNote = numberColumn
+    ? `<p class="text-xs text-ink/40 -mt-1 mb-1">"${escapeHtml(numberColumn)}" سيُحدَّد تلقائياً (ترقيم تسلسلي)</p>`
+    : '';
+
+  el.appendixFormFields.innerHTML =
+    numberNote +
+    editableColumns
+      .map(
+        (col) => `
       <label class="block">
         <span class="block text-xs font-semibold text-ink/55 mb-1.5">${escapeHtml(col)}</span>
         <input type="text" class="appendix-field-input w-full border border-line rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay" data-column="${escapeAttr(col)}" />
       </label>`
-    )
-    .join('');
+      )
+      .join('');
 }
 
 el.appendixBtn?.addEventListener('click', openAppendixModal);
 el.appendixModalClose?.addEventListener('click', closeAppendixModal);
 el.appendixModalOverlay?.addEventListener('click', closeAppendixModal);
+// إغلاق إضافي عند الضغط خارج الصندوق الأبيض مباشرة (على خلفية النافذة
+// نفسها، لا الطبقة المنفصلة)، لضمان الإغلاق بغض النظر عن ترتيب الطبقات.
+el.appendixModal?.addEventListener('click', (event) => {
+  if (event.target === el.appendixModal) closeAppendixModal();
+});
 el.appendixModeIndividual?.addEventListener('click', () => setAppendixMode('individual'));
 el.appendixModeExcel?.addEventListener('click', () => setAppendixMode('excel'));
 
