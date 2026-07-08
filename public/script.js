@@ -231,6 +231,7 @@ const el = {
   appendixFormFields: document.getElementById('appendixFormFields'),
   appendixIndividualSubmit: document.getElementById('appendixIndividualSubmit'),
   appendixFileInput: document.getElementById('appendixFileInput'),
+  appendixTemplateBtn: document.getElementById('appendixTemplateBtn'),
   appendixExcelStatus: document.getElementById('appendixExcelStatus'),
 };
 
@@ -1314,6 +1315,29 @@ function renderAppendixForm() {
       )
       .join('');
 }
+
+/**
+ * يولّد ملف Excel فارغاً بنفس أعمدة الجلسة الحالية بالضبط (نفس الأسماء
+ * والترتيب) ليعبّيه المستخدم يدوياً ويرفعه كملحق، بدل ما يخمّن أسماء
+ * الأعمدة بنفسه. الورقة تُضبط صراحة كـ"من اليمين لليسار" (RTL) عبر
+ * '!views' — بدون هذا الضبط، إكسل يفتحها افتراضياً من اليسار لليمين حتى
+ * لو المحتوى عربي، وتبدو مقلوبة الاتجاه بصرياً.
+ */
+function downloadAppendixTemplate() {
+  if (allColumns.length === 0) return;
+
+  const worksheet = XLSX.utils.aoa_to_sheet([allColumns]);
+  worksheet['!views'] = [{ rightToLeft: true }];
+  // عرض معقول لكل عمود حسب طول اسمه، حتى تظهر العناوين كاملة دون قصّ
+  worksheet['!cols'] = allColumns.map((col) => ({ wch: Math.max(12, col.length + 4) }));
+
+  const workbook = XLSX.utils.book_new();
+  workbook.Workbook = { views: [{ RTL: true }] }; // اتجاه المصنّف بالكامل RTL أيضاً (تبويبات/شريط الأدوات)
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'نموذج ملحق');
+  XLSX.writeFile(workbook, 'نموذج_إضافة_ملحق.xlsx');
+}
+
+el.appendixTemplateBtn?.addEventListener('click', downloadAppendixTemplate);
 
 el.appendixBtn?.addEventListener('click', openAppendixModal);
 el.appendixModalClose?.addEventListener('click', closeAppendixModal);
