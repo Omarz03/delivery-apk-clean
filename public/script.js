@@ -219,6 +219,19 @@ const el = {
   identifierColumnsList: document.getElementById('identifierColumnsList'),
   identifierConfirmBtn: document.getElementById('identifierConfirmBtn'),
   identifierSkipBtn: document.getElementById('identifierSkipBtn'),
+  // نافذة "إضافة ملحق"
+  appendixBtn: document.getElementById('appendixBtn'),
+  appendixModal: document.getElementById('appendixModal'),
+  appendixModalOverlay: document.getElementById('appendixModalOverlay'),
+  appendixModalClose: document.getElementById('appendixModalClose'),
+  appendixModeIndividual: document.getElementById('appendixModeIndividual'),
+  appendixModeExcel: document.getElementById('appendixModeExcel'),
+  appendixIndividualView: document.getElementById('appendixIndividualView'),
+  appendixExcelView: document.getElementById('appendixExcelView'),
+  appendixFormFields: document.getElementById('appendixFormFields'),
+  appendixIndividualSubmit: document.getElementById('appendixIndividualSubmit'),
+  appendixFileInput: document.getElementById('appendixFileInput'),
+  appendixExcelStatus: document.getElementById('appendixExcelStatus'),
 };
 
 /* -------------------------------------------------------------------------
@@ -656,6 +669,87 @@ el.fileInput.addEventListener('change', async (event) => {
  * الجهاز أو جهاز آخر، الآن أو لاحقاً — يُنتج نفس المعرّفات دائماً، فلا
  * تتكرر بيانات المستفيدين عند المزامنة أو إعادة الاستيراد.
  */
+/* -------------------------------------------------------------------------
+   إضافة مستفيدين كـ"ملحق" بعد بدء الجلسة (بدون استبدال البيانات الحالية)
+   -------------------------------------------------------------------------
+   يفيد ميدانياً لما يظهر مستفيدون إضافيون بعد بدء التسليم (لم يكونوا
+   بالملف الأصلي). الإضافة تصير آخر الجدول، مع علامة داخلية (__isAppendix)
+   وملاحظة تلقائية "ملحق" لتمييزها، وتُبَث فوراً لبقية الأجهزة عبر نفس
+   آلية بث التحديثات العادية (record_updated) — أي جهاز متصل يقدر يضيف.
+   ------------------------------------------------------------------------- */
+
+/**
+ * تبني معرّف مزامنة (__syncId) لسجل ملحق جديد بنفس منطق الاستيراد الأساسي
+ * تمامًا (عمود المعرّف المحفوظ إن وُجد، وإلا hash لمحتوى الصف)، مع تفادي أي
+ * تصادم مع معرّفات موجودة فعلاً (محلياً أو ضمن نفس دفعة الإضافة).
+ */
+function buildAppendixSyncId(row, columns, identifierColumn, existingSyncIds) {
+  if (identifierColumn) {
+    const key = normalizeIdValue(row[identifierColumn]);
+    if (key) {
+      const candidate = `key:${identifierColumn}:${key}`;
+      if (!existingSyncIds.has(candidate)) return candidate;
+    }
+  }
+  return `content:${hashRowContent(row, columns)}`;
+}
+
+/**
+ * تجهّز وتحفظ وتبثّ دفعة من سجلات "ملحق" جديدة. مشتركة بين مسار الإضافة
+ * الفردية ومسار استيراد ملف Excel كملحق.
+ * @param {Array<Object>} rawRows صفوف خام (مفاتيحها = أسماء الأعمدة)
+ */
+async function addAppendixRecords(rawRows) {
+  if (!rawRows.length) return { added: 0, skipped: 0 };
+
+  const identifierColumn = (await getMeta('identifierColumn')) || null;
+  const existingSyncIds = new Set(allRecords.map((r) => r.__syncId));
+  const now = Date.now();
+  let skipped = 0;
+
+  const newRecords = [];
+  for (const row of rawRows) {
+    // نطبّع الصف على نفس أعمدة الجلسة الحالية بالضبط (نتجاهل أي عمود زائد
+    // غير معروف، ونملأ أي عمود ناقص بقيمة فارغة) حتى يبقى الجدول متّسقاً.
+    const normalizedRow = {};
+    allColumns.forEach((col) => {
+      normalizedRow[col] = row[col] ?? '';
+    });
+
+    const syncId = buildAppendixSyncId(normalizedRow, allColumns, identifierColumn, existingSyncIds);
+    if (existingSyncIds.has(syncId)) {
+      skipped += 1; // نفس الشخص مضاف مسبقاً (نفس عمود المعرّف) — نتجاهله بدل تكراره
+      continue;
+    }
+    existingSyncIds.add(syncId);
+
+    const record = {
+      ...normalizedRow,
+      __status: false,
+      __receiver: '',
+      __notes: 'ملحق',
+      __isAppendix: true,
+      __syncId: syncId,
+      __updatedAt: now,
+    };
+
+    const localId = await addSingleRecord(record);
+    const saved = { ...record, id: localId };
+    allRecords.push(saved);
+    newRecords.push(saved);
+  }
+
+  if (newRecords.length > 0) {
+    renderApp();
+    // نبثّ كل سجل جديد فوراً لبقية الأجهزة — نفس آلية بث أي تعديل عادي،
+    // وستُدمَج تلقائياً عند الطرف الآخر عبر upsertBySyncId (يضيفها كسجل
+    // جديد بما أن معرّفها غير موجود لديه).
+    newRecords.forEach((r) => broadcastRecordUpdate(r));
+  }
+
+  return { added: newRecords.length, skipped };
+}
+
 async function finalizeImport(rows, columns, identifierColumn, fileName) {
   const now = Date.now();
   const usedFallbackIds = []; // صفوف اضطررنا نعطيها معرّفاً عشوائياً (قيمة معرّف فارغة أو مكررة)
@@ -868,7 +962,8 @@ function renderTableRows() {
         .join('');
 
       const lockedClass = isLockedByOther ? ' row-locked' : '';
-      return `<tr data-id="${record.id}" class="${lockedClass}">${`<td>${statusCell}</td>`}${dataCells}</tr>`;
+      const appendixClass = record.__isAppendix ? ' bg-clay/10' : '';
+      return `<tr data-id="${record.id}" class="${lockedClass}${appendixClass}">${`<td>${statusCell}</td>`}${dataCells}</tr>`;
     })
     .join('');
 
@@ -1147,6 +1242,120 @@ el.exportBtn.addEventListener('click', () => {
 });
 
 /* -------------------------------------------------------------------------
+   نافذة "إضافة ملحق" — التفاعل مع الواجهة
+   ------------------------------------------------------------------------- */
+function openAppendixModal() {
+  if (allColumns.length === 0) return; // لا معنى للإضافة قبل بدء جلسة أصلاً
+  setAppendixMode('individual');
+  renderAppendixForm();
+  el.appendixExcelStatus.textContent = '';
+  el.appendixModal.classList.remove('hidden');
+  el.appendixModal.classList.add('flex');
+  el.appendixModalOverlay.classList.add('open');
+}
+
+function closeAppendixModal() {
+  el.appendixModal.classList.add('hidden');
+  el.appendixModal.classList.remove('flex');
+  el.appendixModalOverlay.classList.remove('open');
+}
+
+function setAppendixMode(mode) {
+  const isIndividual = mode === 'individual';
+  el.appendixIndividualView.classList.toggle('hidden', !isIndividual);
+  el.appendixExcelView.classList.toggle('hidden', isIndividual);
+  el.appendixModeIndividual.className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+    isIndividual ? 'bg-white text-pine shadow-sm' : 'text-ink/50'
+  }`;
+  el.appendixModeExcel.className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+    !isIndividual ? 'bg-white text-pine shadow-sm' : 'text-ink/50'
+  }`;
+}
+
+/** يبني حقول نموذج الإضافة الفردية ديناميكياً حسب أعمدة الجلسة الحالية. */
+function renderAppendixForm() {
+  el.appendixFormFields.innerHTML = allColumns
+    .map(
+      (col) => `
+      <label class="block">
+        <span class="block text-xs font-semibold text-ink/55 mb-1.5">${escapeHtml(col)}</span>
+        <input type="text" class="appendix-field-input w-full border border-line rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay" data-column="${escapeAttr(col)}" />
+      </label>`
+    )
+    .join('');
+}
+
+el.appendixBtn?.addEventListener('click', openAppendixModal);
+el.appendixModalClose?.addEventListener('click', closeAppendixModal);
+el.appendixModalOverlay?.addEventListener('click', closeAppendixModal);
+el.appendixModeIndividual?.addEventListener('click', () => setAppendixMode('individual'));
+el.appendixModeExcel?.addEventListener('click', () => setAppendixMode('excel'));
+
+el.appendixIndividualSubmit?.addEventListener('click', async () => {
+  const row = {};
+  let hasAnyValue = false;
+  el.appendixFormFields.querySelectorAll('.appendix-field-input').forEach((input) => {
+    const val = input.value.trim();
+    row[input.dataset.column] = val;
+    if (val) hasAnyValue = true;
+  });
+
+  if (!hasAnyValue) {
+    window.showToast?.('عبّئ حقلاً واحداً على الأقل قبل الإضافة', 'error', 2500);
+    return;
+  }
+
+  const { added, skipped } = await addAppendixRecords([row]);
+  if (added > 0) {
+    window.showToast?.('تمت إضافة المستفيد كملحق بنجاح', 'success', 2500);
+    closeAppendixModal();
+  } else if (skipped > 0) {
+    window.showToast?.('هذا المستفيد مضاف مسبقاً (نفس المعرّف الفريد)', 'error', 3000);
+  }
+});
+
+el.appendixFileInput?.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  el.appendixExcelStatus.textContent = 'جاري القراءة...';
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+    if (rows.length === 0) {
+      el.appendixExcelStatus.textContent = 'الملف لا يحتوي على بيانات قابلة للقراءة.';
+      return;
+    }
+
+    const fileColumns = Object.keys(rows[0]);
+    const overlap = fileColumns.filter((c) => allColumns.includes(c));
+    if (overlap.length === 0) {
+      el.appendixExcelStatus.textContent =
+        'أعمدة هذا الملف لا تطابق أعمدة الجلسة الحالية إطلاقاً — تأكد من استخدام نفس الملف الأصلي كقالب.';
+      return;
+    }
+
+    const { added, skipped } = await addAppendixRecords(rows);
+    el.appendixExcelStatus.textContent = `تمت إضافة ${added} سجل كملحق${
+      skipped > 0 ? `، وتجاهُل ${skipped} سجل مكرر (نفس المعرّف الفريد)` : ''
+    }.`;
+    if (added > 0) {
+      window.showToast?.(`تمت إضافة ${added} مستفيد كملحق بنجاح`, 'success', 3000);
+      setTimeout(closeAppendixModal, 1200);
+    }
+  } catch (error) {
+    console.error(error);
+    el.appendixExcelStatus.textContent = 'تعذّرت قراءة الملف. تأكد أنه بصيغة Excel صحيحة (.xlsx أو .xls).';
+  } finally {
+    el.appendixFileInput.value = '';
+  }
+});
+
+/* -------------------------------------------------------------------------
    10) المزامنة الآنية بين الأجهزة (Socket.io)
    -------------------------------------------------------------------------
    فكرة العمل:
@@ -1398,6 +1607,10 @@ function setupBackButtonGuard() {
   function closeTopmostOverlay() {
     if (document.getElementById('sessionModal')?.classList.contains('open')) {
       window.closeModal?.();
+      return true;
+    }
+    if (el.appendixModal && !el.appendixModal.classList.contains('hidden')) {
+      closeAppendixModal();
       return true;
     }
     if (el.identifierModal && !el.identifierModal.classList.contains('hidden')) {
