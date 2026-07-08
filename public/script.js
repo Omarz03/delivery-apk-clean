@@ -1089,7 +1089,7 @@ function setStatusFilter(key) {
   document.querySelectorAll('.status-filter-btn').forEach((btn) => {
     const isActive = btn.dataset.statusFilter === key;
     btn.className = `status-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-      isActive ? 'bg-white text-pine shadow-sm' : 'text-ink/50'
+      isActive ? 'bg-pine text-white' : 'text-ink/55 hover:bg-paper hover:text-ink'
     }`;
   });
   renderTableRows();
