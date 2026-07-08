@@ -137,6 +137,47 @@
     </div>
   </div>
 
+  <!-- نافذة "إضافة ملحق" — إضافة مستفيدين جدد بعد بدء الجلسة، بطريقتين -->
+  <div id="appendixModalOverlay" class="drawer-overlay"></div>
+  <div id="appendixModal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-1.5">
+        <h3 class="font-display font-bold text-pine text-base">إضافة ملحق</h3>
+        <button id="appendixModalClose" class="text-ink/50 hover:text-ink p-1 rounded-lg" aria-label="إغلاق">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p class="text-sm text-ink/60 mb-4">مستفيدون إضافيون لم يكونوا بالملف الأصلي. تُضاف بآخر الجدول مع تمييز واضح، وتُزامَن فوراً مع بقية الأجهزة.</p>
+
+      <!-- مبدّل الطريقة -->
+      <div class="flex gap-2 mb-4 bg-paper rounded-xl p-1">
+        <button id="appendixModeIndividual" class="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors bg-white text-pine shadow-sm">إضافة فردية</button>
+        <button id="appendixModeExcel" class="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors text-ink/50">ملف Excel</button>
+      </div>
+
+      <!-- وضع الإضافة الفردية -->
+      <div id="appendixIndividualView">
+        <div id="appendixFormFields" class="flex flex-col gap-3 mb-4">
+          <!-- تُبنى حقول ديناميكياً حسب أعمدة الجلسة الحالية في script.js -->
+        </div>
+        <button id="appendixIndividualSubmit" class="w-full bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm py-2.5 rounded-xl">
+          إضافة للجدول
+        </button>
+      </div>
+
+      <!-- وضع استيراد ملف Excel -->
+      <div id="appendixExcelView" class="hidden">
+        <p class="text-xs text-ink/50 mb-3">يجب أن يحتوي الملف على نفس أعمدة الجلسة الحالية (بنفس الأسماء). أي عمود ناقص سيُترك فارغاً، وأي عمود زائد غير معروف سيُتجاهل.</p>
+        <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-line rounded-xl py-8 cursor-pointer hover:border-clay/60 transition-colors">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-ink/40"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
+          <span class="text-sm font-medium text-ink/60">اضغط لاختيار ملف Excel</span>
+          <input id="appendixFileInput" type="file" accept=".xlsx,.xls" class="hidden" />
+        </label>
+        <p id="appendixExcelStatus" class="text-xs mt-3 font-medium text-ink/50"></p>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== لوحة الجلسة: الاستيراد + المزامنة (تُفتح من زر "الجلسة") ===================== -->
   <div id="sessionPanelOverlay" class="drawer-overlay"></div>
   <aside id="sessionPanel" class="session-panel" aria-hidden="true">
@@ -295,8 +336,12 @@
         <p id="noResults" class="hidden text-center text-ink/40 text-sm py-10">لا توجد نتائج مطابقة للبحث.</p>
       </div>
 
-      <!-- زر التصدير -->
-      <div class="flex justify-end">
+      <!-- زرا الإضافة كملحق والتصدير -->
+      <div class="flex justify-between items-center gap-3 flex-wrap">
+        <button id="appendixBtn" class="inline-flex items-center gap-2 bg-white hover:bg-paper border border-line transition-colors text-ink font-semibold text-sm px-4 py-3 rounded-xl">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          إضافة ملحق
+        </button>
         <button id="exportBtn" class="inline-flex items-center gap-2 bg-pine hover:bg-pineLight transition-colors text-white font-semibold text-sm px-5 py-3 rounded-xl">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" transform="rotate(180 12 12)"/></svg>
           تصدير كملف Excel
