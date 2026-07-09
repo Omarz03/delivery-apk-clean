@@ -38,6 +38,53 @@ function releaseWakeLock() {
 }
 
 /* -----------------------------------------------------------------------
+   "صوت إبقاء نشط" خافت جداً أثناء الجلسة — يعمل حتى لو الشاشة انطفت
+   -------------------------------------------------------------------------
+   المتصفحات على أندرويد تستثني التبويبات التي "تُصدر صوتاً فعلياً" من
+   التجميد الذي تفرضه على التبويبات الصامتة المخفية بالخلفية (نفس الآلية
+   التي تُبقي تطبيقات الموسيقى/البودكاست تعمل والشاشة مطفأة). نستغل هذا
+   بتشغيل نغمة بمستوى صوت شبه معدوم (غير صفري تماماً، لأن بعض المتصفحات
+   تتجاهل مقاطع بمستوى صفر تحديداً كحماية من هذه الحيلة بالذات) طوال مدة
+   الجلسة النشطة، بغض النظر عن حالة الشاشة. هذا تحسين احتمالي وليس ضماناً
+   مطلقاً — أنظمة توفير بطارية عدوانية (مثل MIUI) قد تتجاوزه رغم ذلك.
+   ----------------------------------------------------------------------- */
+let audioKeepAliveCtx = null;
+let audioKeepAliveOsc = null;
+
+function startAudioKeepAlive() {
+  if (audioKeepAliveCtx) return; // شغالة أصلاً
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioKeepAliveCtx = new Ctx();
+    const gain = audioKeepAliveCtx.createGain();
+    gain.gain.value = 0.001; // شبه غير مسموع للأذن البشرية، لكن ليس صفراً رياضياً
+    audioKeepAliveOsc = audioKeepAliveCtx.createOscillator();
+    audioKeepAliveOsc.frequency.value = 20; // تردد منخفض جداً، تحت حدود السمع تقريباً
+    audioKeepAliveOsc.connect(gain);
+    gain.connect(audioKeepAliveCtx.destination);
+    audioKeepAliveOsc.start();
+    // متصفحات كثيرة تُنشئ AudioContext بحالة "معلّقة" بدون تفاعل مستخدم
+    // مباشر — نحاول استئنافه صراحة (يعمل هنا غالباً لأن بدء الجلسة نفسه
+    // كان نتيجة ضغطة مستخدم فعلية قبل لحظات قليلة).
+    audioKeepAliveCtx.resume?.().catch(() => {});
+  } catch (e) {
+    console.warn('تعذّر تفعيل صوت الإبقاء نشطاً بالخلفية (غير حرج):', e);
+  }
+}
+
+function stopAudioKeepAlive() {
+  try {
+    audioKeepAliveOsc?.stop();
+    audioKeepAliveCtx?.close();
+  } catch (e) {
+    // لا شيء حرج — الهدف فقط تحرير الموارد
+  }
+  audioKeepAliveCtx = null;
+  audioKeepAliveOsc = null;
+}
+
+/* -----------------------------------------------------------------------
    منع "اسحب للتحديث" (Pull-to-refresh) أثناء وجود جلسة P2P نشطة فقط
    -------------------------------------------------------------------------
    على أندرويد/كروم، السحب لأسفل من أعلى الصفحة يُعيد تحميلها بالكامل —
@@ -88,6 +135,13 @@ document.addEventListener('visibilitychange', () => {
     if (p2p.connected && !wakeLock) {
       requestWakeLock();
     }
+    if (p2p.connected) {
+      if (audioKeepAliveCtx?.state === 'suspended') {
+        audioKeepAliveCtx.resume().catch(() => {});
+      } else if (!audioKeepAliveCtx) {
+        startAudioKeepAlive();
+      }
+    }
     // فور رجوع التطبيق للواجهة، نحفّز محاولة استرجاع فورية بدل انتظار
     // مهلة السماح الكاملة (25 ثانية) — يفيد تحديداً حين يكون المستخدم
     // قد أعاد فتح التطبيق قبل انتهاء المهلة.
@@ -102,6 +156,7 @@ p2p.addEventListener('channel-open', async () => {
   console.log('P2P channel open — بدء المزامنة الأولية');
   updateP2PStatusUI(true);
   await requestWakeLock();
+  startAudioKeepAlive();
 
   // "تعارف" بسيط بين الجهازين: كل طرف يرسل هويته المبسّطة (بدون معلومات
   // حساسة) حتى تظهر بلوحة "الأجهزة المتصلة" باسم مفهوم بدل فراغ دائم.
@@ -119,6 +174,7 @@ p2p.addEventListener('channel-closed', () => {
   updateP2PStatusUI(false);
   renderConnectedDevice(null);
   releaseWakeLock();
+  stopAudioKeepAlive();
   window.showToast?.('انقطع الاتصال بالجهاز الآخر — التطبيق يعمل محلياً', 'info', 3000);
 });
 
@@ -126,6 +182,7 @@ p2p.addEventListener('disconnected', () => {
   updateP2PStatusUI(false);
   renderConnectedDevice(null);
   releaseWakeLock();
+  stopAudioKeepAlive();
 });
 
 p2p.addEventListener('transfer-incomplete', (event) => {
