@@ -195,6 +195,7 @@ const el = {
   receiverInput: document.getElementById('receiverInput'),
   notesInput: document.getElementById('notesInput'),
   deliveryAttribution: document.getElementById('deliveryAttribution'),
+  appendixAttribution: document.getElementById('appendixAttribution'),
   syncDot: document.getElementById('syncDot'),
   syncLabel: document.getElementById('syncLabel'),
   syncMessage: document.getElementById('syncMessage'),
@@ -358,7 +359,14 @@ function formatDeliveryTimestamp(timestamp) {
   if (!timestamp) return '';
   const d = new Date(timestamp);
   const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  let hours12 = d.getHours() % 12;
+  if (hours12 === 0) hours12 = 12;
+  const period = d.getHours() < 12 ? 'ص' : 'م';
+
+  const datePart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const timePart = `${pad(hours12)}:${pad(d.getMinutes())} ${period}`;
+  return `${datePart} ${timePart}`;
 }
 
 /**
@@ -754,6 +762,8 @@ async function addAppendixRecords(rawRows) {
       __receiver: '',
       __notes: 'ملحق',
       __isAppendix: true,
+      __addedByName: deviceName || 'غير معروف',
+      __addedAt: now,
       __syncId: syncId,
       __updatedAt: now,
     };
@@ -1161,6 +1171,22 @@ function renderDeliveryAttribution(record) {
   el.deliveryAttribution.classList.remove('hidden');
 }
 
+/** يعرض ملاحظة "تمت الإضافة كملحق في [وقت] بواسطة [اسم]" أعلى النافذة الجانبية. */
+function renderAppendixAttribution(record) {
+  if (!el.appendixAttribution) return;
+
+  if (!record?.__isAppendix) {
+    el.appendixAttribution.classList.add('hidden');
+    el.appendixAttribution.textContent = '';
+    return;
+  }
+
+  const time = record.__addedAt ? formatDeliveryTimestamp(record.__addedAt) : 'غير معروف';
+  const name = record.__addedByName || 'غير معروف';
+  el.appendixAttribution.textContent = `ملحق — تمت الإضافة في ${time} بواسطة ${name}`;
+  el.appendixAttribution.classList.remove('hidden');
+}
+
 function openDrawer(id) {
   const record = allRecords.find((r) => r.id === id);
   if (!record) return;
@@ -1182,6 +1208,7 @@ function openDrawer(id) {
   el.receiverInput.value = record.__receiver || '';
   el.notesInput.value = record.__notes || '';
   renderDeliveryAttribution(record);
+  renderAppendixAttribution(record);
 
   el.drawer.classList.add('open');
   el.drawer.setAttribute('aria-hidden', 'false');
@@ -1729,8 +1756,6 @@ if ('serviceWorker' in navigator) {
    بالأندرويد يُدار بطريقة مختلفة تماماً بكل حالة.
    ------------------------------------------------------------------------- */
 function setupBackButtonGuard() {
-  let hasShownBackButtonHint = false;
-
   /**
    * تتحقق من أي قائمة جانبية/نافذة مفتوحة حالياً وتسكرها (بمثابة الضغط على
    * "إلغاء" أو ×)، وتُعيد true إن كانت أغلقت شيئاً فعلاً.
@@ -1769,19 +1794,16 @@ function setupBackButtonGuard() {
   }
 
   // "معالج القرار" المشترك: يُستدعى من أي مصدر (Capacitor أو popstate) عند
-  // ضغطة رجوع واحدة. يُغلق أي نافذة مفتوحة إن وُجدت، وإلا ينبّه المستخدم
-  // (مرة واحدة فقط بكل جلسة استخدام) أن الخروج صار فقط عبر الرئيسية.
+  // ضغطة رجوع واحدة. يُغلق أي نافذة مفتوحة إن وُجدت، وإلا ينبّه المستخدم في
+  // كل مرة (لا حاجة لتعقيد "مرة واحدة فقط") أن الخروج صار فقط عبر الرئيسية.
   function handleBackPress() {
     if (closeTopmostOverlay()) return;
 
-    if (!hasShownBackButtonHint) {
-      hasShownBackButtonHint = true;
-      window.showToast(
-        'زر الرجوع لا يُغلق التطبيق — استخدم زر الرئيسية للخروج',
-        'info',
-        3000
-      );
-    }
+    window.showToast(
+      'زر الرجوع لا يُغلق التطبيق — استخدم زر الرئيسية للخروج',
+      'info',
+      2500
+    );
   }
 
   // --- الحالة 1: تطبيق أندرويد أصلي (APK) عبر Capacitor ---
@@ -1804,10 +1826,15 @@ function setupBackButtonGuard() {
   // على "مخزون" من عدة حالات وهمية دفعة واحدة بدل حالة واحدة تُستهلك فوراً،
   // ونعيد تعبئته أيضاً عند أي عودة للظهور (وليس فقط عند كل ضغطة رجوع).
   const GUARD_BUFFER_SIZE = 6;
+  let guardCounter = 0;
 
   function primeGuardBuffer() {
     for (let i = 0; i < GUARD_BUFFER_SIZE; i += 1) {
-      history.pushState({ __exitGuard: true }, '');
+      guardCounter += 1;
+      // كل حالة برابط فريد (وليس نفس الرابط الحالي مكرراً) — بعض المتصفحات
+      // قد لا تُنشئ وقفة تاريخ منفصلة فعلياً لضغطات pushState متتالية بنفس
+      // الرابط تماماً، وهذا احتمال حقيقي فسّر استمرار المشكلة سابقاً.
+      history.pushState({ __exitGuard: true }, '', `#stay-${guardCounter}`);
     }
   }
 
@@ -1825,6 +1852,15 @@ function setupBackButtonGuard() {
     if (document.visibilityState === 'visible') primeGuardBuffer();
   });
   window.addEventListener('pageshow', () => primeGuardBuffer());
+
+  // خط دفاع أخير: لو فشلت كل الحيل أعلاه لأي سبب وكانت الصفحة فعلاً على
+  // وشك الإغلاق/التنقل بعيداً، نطلب تأكيداً صريحاً من المتصفح نفسه (نافذة
+  // "هل تريد المغادرة؟" أصلية). لا تعمل بكل الحالات على الموبايل، لكنها
+  // شبكة أمان إضافية بدون أي تكلفة.
+  window.addEventListener('beforeunload', (event) => {
+    event.preventDefault();
+    event.returnValue = '';
+  });
 }
 
 /* -------------------------------------------------------------------------
