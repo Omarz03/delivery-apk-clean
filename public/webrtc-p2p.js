@@ -90,6 +90,20 @@ class DeliveryP2P extends EventTarget {
     this.connected = false;
     this._receiveBuffer = ''; // بافر لتجميع chunks الرسائل الكبيرة
     this._disconnectGraceTimer = null; // مهلة سماح قبل إعلان انقطاع حقيقي
+
+    // لو المستخدم رجع لواجهة التطبيق بينما مهلة السماح "الطويلة" (بالخلفية)
+    // لسا شغالة، نلغيها فوراً ونبدأ مهلة قصيرة طبيعية بدلها مع محاولة
+    // استرجاع جديدة — لا داعي للانتظار دقائق إضافية بعد ما صار المستخدم
+    // فعلياً ينظر للشاشة من جديد.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || !this._disconnectGraceTimer) return;
+      clearTimeout(this._disconnectGraceTimer);
+      this._disconnectGraceTimer = null;
+      if (this.pc && !['connected', 'closed'].includes(this.pc.connectionState)) {
+        this._attemptIceRestart();
+        this._armDisconnectGraceTimer();
+      }
+    });
   }
 
   /* -----------------------------------------------------------------------
@@ -196,6 +210,26 @@ class DeliveryP2P extends EventTarget {
   }
 
   /**
+   * يضبط مهلة السماح قبل إعلان انقطاع حقيقي. المدة تعتمد على ظهور الصفحة:
+   * - بالمقدمة (الشاشة مضوية والتطبيق ظاهر): 25 ثانية — فرصة معقولة لتذبذب
+   *   شبكة عابر دون تأخير إشعار المستخدم بمشكلة حقيقية طويلاً.
+   * - بالخلفية (مصغّر/الشاشة مطفية): 10 دقائق — الهدف هنا ليس "انتظار تعافي
+   *   الشبكة" بقدر ما هو تجنّب إصدار حكم نهائي بالانقطاع بينما المستخدم
+   *   أصلاً لا يرى الشاشة ولا يستفيد من إشعار فوري؛ لحظة عودته للواجهة
+   *   (visibilitychange) تُعاد هذه المهلة لقيمتها القصيرة الطبيعية فوراً.
+   */
+  _armDisconnectGraceTimer() {
+    const duration = document.hidden ? 10 * 60 * 1000 : 25000;
+    this._disconnectGraceTimer = setTimeout(() => {
+      this._disconnectGraceTimer = null;
+      if (this.pc && this.pc.connectionState !== 'connected') {
+        this.connected = false;
+        this._dispatch('disconnected', { state: this.pc.connectionState });
+      }
+    }, duration);
+  }
+
+  /**
    * تُستدعى من الواجهة (مثلاً عند عودة التطبيق من الخلفية) لتحفيز محاولة
    * استرجاع فورية بدل انتظار مهلة السماح كاملة.
    */
@@ -248,13 +282,7 @@ class DeliveryP2P extends EventTarget {
         // السماح نعتبره انقطاعاً حقيقياً ونطلب جلسة جديدة.
         if (!this._disconnectGraceTimer) {
           this._attemptIceRestart();
-          this._disconnectGraceTimer = setTimeout(() => {
-            this._disconnectGraceTimer = null;
-            if (this.pc && this.pc.connectionState !== 'connected') {
-              this.connected = false;
-              this._dispatch('disconnected', { state: this.pc.connectionState });
-            }
-          }, 25000); // مهلة أطول (كانت 6 ثوانٍ) لإعطاء فرصة حقيقية للتعافي التلقائي
+          this._armDisconnectGraceTimer();
         }
 
       } else if (['failed', 'closed'].includes(state)) {
