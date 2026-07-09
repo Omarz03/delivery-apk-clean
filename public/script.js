@@ -1794,16 +1794,31 @@ function setupBackButtonGuard() {
   }
 
   // "معالج القرار" المشترك: يُستدعى من أي مصدر (Capacitor أو popstate) عند
-  // ضغطة رجوع واحدة. يُغلق أي نافذة مفتوحة إن وُجدت، وإلا ينبّه المستخدم في
-  // كل مرة (لا حاجة لتعقيد "مرة واحدة فقط") أن الخروج صار فقط عبر الرئيسية.
-  function handleBackPress() {
-    if (closeTopmostOverlay()) return;
+  // ضغطة رجوع واحدة، ويُعيد true إن كان يجب فعلاً الخروج الآن.
+  //
+  // ملاحظة فنية مهمة: لا توجد طريقة تجعل الخروج عبر زر الرجوع "مستحيلاً"
+  // 100% — هذا قرار أمان متعمّد بتصميم المتصفحات نفسها (لمنع مواقع خبيثة من
+  // "حبس" المستخدم داخل الصفحة)، وليس قصوراً بالتنفيذ. أقصى ما يمكن ضمانه
+  // فعلياً هو نمط "اضغط رجوع مرتين للخروج" المعتاد بمعظم تطبيقات أندرويد.
+  const EXIT_CONFIRM_WINDOW_MS = 2500;
+  let awaitingExitConfirm = false;
+  let exitConfirmTimer = null;
 
-    window.showToast(
-      'زر الرجوع لا يُغلق التطبيق — استخدم زر الرئيسية للخروج',
-      'info',
-      2500
-    );
+  function shouldExitNow() {
+    if (closeTopmostOverlay()) return false;
+
+    if (awaitingExitConfirm) {
+      clearTimeout(exitConfirmTimer);
+      awaitingExitConfirm = false;
+      return true; // ضغطة ثانية خلال المهلة — خروج فعلي
+    }
+
+    awaitingExitConfirm = true;
+    window.showToast('اضغط رجوع مرة أخرى للخروج من التطبيق', 'info', EXIT_CONFIRM_WINDOW_MS);
+    exitConfirmTimer = setTimeout(() => {
+      awaitingExitConfirm = false;
+    }, EXIT_CONFIRM_WINDOW_MS);
+    return false; // ضغطة أولى — تحذير فقط
   }
 
   // --- الحالة 1: تطبيق أندرويد أصلي (APK) عبر Capacitor ---
@@ -1813,53 +1828,28 @@ function setupBackButtonGuard() {
   const isNative = window.Capacitor?.getPlatform?.() !== 'web';
   const appPlugin = window.Capacitor?.Plugins?.App;
   if (isNative && appPlugin && typeof appPlugin.addListener === 'function') {
-    appPlugin.addListener('backButton', handleBackPress);
+    appPlugin.addListener('backButton', () => {
+      if (shouldExitNow()) appPlugin.exitApp();
+    });
     return;
   }
 
   // --- الحالة 2: PWA/صفحة ويب عادية (الوضع الحالي فعلياً) ---
-  // زر رجوع أندرويد هنا يُترجَم لحدث popstate على تاريخ المتصفح. الاعتماد
-  // على "حالة وهمية واحدة" فقط تبيّن عملياً أنه غير موثوق (توثيق تقني معروف
-  // لهذه التقنية): أحياناً لا تُستهلك ضغطة الرجوع الثانية نفس الحالة التي
-  // أعدنا إدراجها فوراً — خصوصاً لو المتصفح "نظّف" مكدس التاريخ أثناء
-  // تصغير التطبيق بالخلفية (شائع بالأجهزة متوسطة الإمكانيات). لذلك نحافظ
-  // على "مخزون" من عدة حالات وهمية دفعة واحدة بدل حالة واحدة تُستهلك فوراً،
-  // ونعيد تعبئته أيضاً عند أي عودة للظهور (وليس فقط عند كل ضغطة رجوع).
-  const GUARD_BUFFER_SIZE = 6;
-  let guardCounter = 0;
-
-  function primeGuardBuffer() {
-    for (let i = 0; i < GUARD_BUFFER_SIZE; i += 1) {
-      guardCounter += 1;
-      // كل حالة برابط فريد (وليس نفس الرابط الحالي مكرراً) — بعض المتصفحات
-      // قد لا تُنشئ وقفة تاريخ منفصلة فعلياً لضغطات pushState متتالية بنفس
-      // الرابط تماماً، وهذا احتمال حقيقي فسّر استمرار المشكلة سابقاً.
-      history.pushState({ __exitGuard: true }, '', `#stay-${guardCounter}`);
-    }
-  }
-
-  primeGuardBuffer();
-
+  // زر رجوع أندرويد هنا يُترجَم لحدث popstate على تاريخ المتصفح. نضيف حالة
+  // وهمية بالتاريخ عند التحميل؛ كل ضغطة رجوع "تستهلك" هذه الحالة فتُطلق
+  // popstate بدل الخروج مباشرة من الصفحة/التطبيق — فنعترضها هنا ونقرر.
+  history.pushState({ __exitGuard: true }, '');
   window.addEventListener('popstate', () => {
-    handleBackPress();
-    primeGuardBuffer(); // نعيد تعبئة المخزون بالكامل بعد كل ضغطة، لا حالة واحدة فقط
-  });
-
-  // احتياط إضافي: لو المتصفح نظّف المكدس أثناء التصغير بالخلفية (Chrome على
-  // الأجهزة الأضعف يفعل هذا أحياناً لتوفير الذاكرة)، نعيد تعبئته فور عودة
-  // الظهور، قبل أن يحتاج المستخدم لضغط الرجوع أصلاً.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') primeGuardBuffer();
-  });
-  window.addEventListener('pageshow', () => primeGuardBuffer());
-
-  // خط دفاع أخير: لو فشلت كل الحيل أعلاه لأي سبب وكانت الصفحة فعلاً على
-  // وشك الإغلاق/التنقل بعيداً، نطلب تأكيداً صريحاً من المتصفح نفسه (نافذة
-  // "هل تريد المغادرة؟" أصلية). لا تعمل بكل الحالات على الموبايل، لكنها
-  // شبكة أمان إضافية بدون أي تكلفة.
-  window.addEventListener('beforeunload', (event) => {
-    event.preventDefault();
-    event.returnValue = '';
+    if (shouldExitNow()) {
+      // خروج فعلي: نُرجع خطوة تاريخ إضافية بدل إعادة إدراج الحارس، حتى
+      // تُغلق الصفحة/التبويب فعلاً (أو تُصغَّر إن كان تطبيقاً مثبَّتاً) بدل
+      // الدخول بحلقة لا نهائية.
+      history.back();
+      return;
+    }
+    // البقاء بالتطبيق: نعيد إدراج نفس حالة الحارس حتى تبقى الحماية فعّالة
+    // لأي ضغطة رجوع لاحقة.
+    history.pushState({ __exitGuard: true }, '');
   });
 }
 
