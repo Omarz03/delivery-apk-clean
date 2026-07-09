@@ -91,14 +91,16 @@ class DeliveryP2P extends EventTarget {
     this._receiveBuffer = ''; // بافر لتجميع chunks الرسائل الكبيرة
     this._disconnectGraceTimer = null; // مهلة سماح قبل إعلان انقطاع حقيقي
 
-    // لو المستخدم رجع لواجهة التطبيق بينما مهلة السماح "الطويلة" (بالخلفية)
-    // لسا شغالة، نلغيها فوراً ونبدأ مهلة قصيرة طبيعية بدلها مع محاولة
-    // استرجاع جديدة — لا داعي للانتظار دقائق إضافية بعد ما صار المستخدم
-    // فعلياً ينظر للشاشة من جديد.
+    // لو المستخدم رجع لواجهة التطبيق، نتحقق فوراً من الحالة الفعلية (بغض
+    // النظر إن كانت هناك مهلة سماح معلّقة أصلاً أم لا — أثناء الاختفاء
+    // الكامل لا نضبط أي مهلة إطلاقاً، انظر _armDisconnectGraceTimer) ونبدأ
+    // مهلة قصيرة طبيعية مع محاولة استرجاع جديدة إن لزم الأمر.
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden || !this._disconnectGraceTimer) return;
-      clearTimeout(this._disconnectGraceTimer);
-      this._disconnectGraceTimer = null;
+      if (document.hidden) return;
+      if (this._disconnectGraceTimer) {
+        clearTimeout(this._disconnectGraceTimer);
+        this._disconnectGraceTimer = null;
+      }
       if (this.pc && !['connected', 'closed'].includes(this.pc.connectionState)) {
         this._attemptIceRestart();
         this._armDisconnectGraceTimer();
@@ -210,23 +212,25 @@ class DeliveryP2P extends EventTarget {
   }
 
   /**
-   * يضبط مهلة السماح قبل إعلان انقطاع حقيقي. المدة تعتمد على ظهور الصفحة:
+   * يضبط مهلة السماح قبل إعلان انقطاع حقيقي:
    * - بالمقدمة (الشاشة مضوية والتطبيق ظاهر): 25 ثانية — فرصة معقولة لتذبذب
    *   شبكة عابر دون تأخير إشعار المستخدم بمشكلة حقيقية طويلاً.
-   * - بالخلفية (مصغّر/الشاشة مطفية): 10 دقائق — الهدف هنا ليس "انتظار تعافي
-   *   الشبكة" بقدر ما هو تجنّب إصدار حكم نهائي بالانقطاع بينما المستخدم
-   *   أصلاً لا يرى الشاشة ولا يستفيد من إشعار فوري؛ لحظة عودته للواجهة
-   *   (visibilitychange) تُعاد هذه المهلة لقيمتها القصيرة الطبيعية فوراً.
+   * - بالخلفية (مصغّر/الشاشة مطفية): لا نضبط أي مهلة إطلاقاً — لا نعلن
+   *   انقطاعاً أبداً طالما المستخدم لم يعد للتطبيق، بغض النظر كم مضى من
+   *   وقت (دقيقة أو ساعة، لا فرق). التقييم الفعلي يحصل فقط لحظة العودة
+   *   للظهور (انظر مستمع visibilitychange بالمُنشئ)، فلا داعي لاختيار رقم
+   *   تعسفي — الحماية "غير محدودة" أثناء الاختفاء الكامل عن الواجهة.
    */
   _armDisconnectGraceTimer() {
-    const duration = document.hidden ? 10 * 60 * 1000 : 25000;
+    if (document.hidden) return; // لا مهلة، لا إعلان انقطاع، طالما مختفٍ عن الواجهة
+
     this._disconnectGraceTimer = setTimeout(() => {
       this._disconnectGraceTimer = null;
       if (this.pc && this.pc.connectionState !== 'connected') {
         this.connected = false;
         this._dispatch('disconnected', { state: this.pc.connectionState });
       }
-    }, duration);
+    }, 25000);
   }
 
   /**
@@ -286,13 +290,18 @@ class DeliveryP2P extends EventTarget {
         }
 
       } else if (['failed', 'closed'].includes(state)) {
-        // انقطاع حاسم ومؤكد — لا داعي لانتظار أي مهلة سماح
+        // انقطاع حاسم ومؤكد — لا داعي لانتظار أي مهلة سماح، لكن نظل ملتزمين
+        // بنفس المبدأ: لا نُصدر أي إعلان بينما المستخدم لا يرى الشاشة أصلاً؛
+        // الحالة الحقيقية (this.pc.connectionState) ستُكتشف وتُعالَج تلقائياً
+        // لحظة عودته للواجهة عبر مستمع visibilitychange بالمُنشئ.
         if (this._disconnectGraceTimer) {
           clearTimeout(this._disconnectGraceTimer);
           this._disconnectGraceTimer = null;
         }
         this.connected = false;
-        this._dispatch('disconnected', { state });
+        if (!document.hidden) {
+          this._dispatch('disconnected', { state });
+        }
       }
     };
 
