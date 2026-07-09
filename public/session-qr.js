@@ -269,6 +269,10 @@ async function startHostSession(isReconnect = false) {
             if (hint) hint.textContent = `تم استقبال ${received} من ${total} — استمر بتوجيه الكاميرا`;
           },
         });
+
+        const hint = document.getElementById('hostScanProgress');
+        if (hint) hint.textContent = 'تم استلام الكود ✓ — جارٍ إكمال الاتصال...';
+
         await window.deliveryP2P.receiveAnswer(answerJson);
 
         // انتظار فتح DataChannel
@@ -281,7 +285,7 @@ async function startHostSession(isReconnect = false) {
 
         window.showToast('تم الاتصال — الجلسة نشطة', 'success');
       } catch (err) {
-        window.showToast('تعذّر مسح الكود. حاول مجدداً.', 'error');
+        window.showToast(connectionErrorMessage(err), 'error', 6000);
         document.getElementById('hostStep2').classList.add('hidden');
         document.getElementById('hostStep1').classList.remove('hidden');
       }
@@ -371,21 +375,25 @@ async function startPeerSession(isReconnect = false) {
     closeModal();
     const msg = err?.name === 'NotAllowedError'
       ? 'لا يوجد إذن للكاميرا. فعّل الإذن من إعدادات التطبيق ثم أعد المحاولة.'
-      : 'تعذّر الانضمام للجلسة. حاول مجدداً.';
-    window.showToast(msg, 'error', 4000);
+      : connectionErrorMessage(err);
+    window.showToast(msg, 'error', 6000);
   }
 }
 
 /* -----------------------------------------------------------------------
-   انتظار فتح DataChannel (مع timeout 30 ثانية)
+   انتظار فتح DataChannel (مع timeout)
+   -------------------------------------------------------------------------
+   15 ثانية كافية جداً لشبكة محلية (Wi-Fi/Hotspot) — لو لم يتصل خلالها فعلياً
+   لن يتصل بعد 30 ثانية أيضاً؛ تقصير المهلة يعطي شعوراً أسرع وأوضح بالخطأ
+   بدل صمت طويل يبدو للمستخدم وكأن التطبيق لا يستجيب إطلاقاً.
    ----------------------------------------------------------------------- */
 function waitForChannel() {
   return new Promise((resolve, reject) => {
     if (window.deliveryP2P.connected) { resolve(); return; }
 
     const timeout = setTimeout(() => {
-      reject(new Error('انتهت مهلة الاتصال'));
-    }, 30000);
+      reject(new Error('TIMEOUT'));
+    }, 15000);
 
     window.deliveryP2P.addEventListener('channel-open', () => {
       clearTimeout(timeout);
@@ -397,6 +405,18 @@ function waitForChannel() {
       reject(e.detail);
     }, { once: true });
   });
+}
+
+/**
+ * رسالة خطأ تشخيصية لفشل إكمال الاتصال — أشيع سبب فعلياً هو أن أحد
+ * الجهازين آيفون ولم يمنح إذن "الشبكة المحلية" لسفاري (أو أن الجهازين
+ * ليسا على نفس شبكة الواي فاي فعلياً)، فنذكر هذا صراحة بدل رسالة عامة.
+ */
+function connectionErrorMessage(err) {
+  if (err?.message === 'TIMEOUT') {
+    return 'تعذّر إكمال الاتصال. تأكد أن الجهازين على نفس شبكة الواي فاي، وإن كان أحدهما آيفون تأكد من تفعيل إذن "الشبكة المحلية" لسفاري من: الإعدادات ← الخصوصية والأمان ← الشبكة المحلية. ثم أعد المحاولة.';
+  }
+  return 'تعذّر إكمال الاتصال. حاول مجدداً.';
 }
 
 /* -----------------------------------------------------------------------
