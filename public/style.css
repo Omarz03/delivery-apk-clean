@@ -313,6 +313,95 @@ textarea:focus-visible {
   }
 }
 
+/* -------------------- تقرير ختام الجلسة -------------------- */
+.report-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.report-stat-card {
+  background: #F4F5F1;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.report-stat-card .report-stat-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 22px;
+  color: #1F2E2A;
+}
+.report-stat-card.is-positive .report-stat-value { color: #2F855A; }
+.report-stat-card.is-pending .report-stat-value { color: #9C4221; }
+.report-stat-card .report-stat-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(26, 33, 30, 0.5);
+}
+.report-breakdown-wrap {
+  margin-bottom: 20px;
+}
+.report-breakdown-title {
+  font-family: "Cairo", sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(26, 33, 30, 0.55);
+  margin-bottom: 8px;
+}
+.report-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.report-breakdown-table th {
+  text-align: right;
+  font-weight: 700;
+  color: rgba(26, 33, 30, 0.5);
+  padding: 6px 8px;
+  border-bottom: 1px solid #DAD9D0;
+  white-space: nowrap;
+}
+.report-breakdown-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #F1F0EA;
+  font-family: "IBM Plex Mono", monospace;
+  white-space: nowrap;
+}
+.report-breakdown-table td:first-child {
+  font-family: "Cairo", sans-serif;
+  white-space: normal;
+}
+
+/* -------------------- تنبيه احتمال تسليم مزدوج -------------------- */
+.duplicate-warning {
+  background: rgba(156, 66, 33, 0.08);
+  border: 1px solid rgba(156, 66, 33, 0.3);
+  color: #9c4221;
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+.duplicate-warning strong {
+  display: block;
+  font-family: "Tajawal", sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.duplicate-warning ul {
+  list-style: disc;
+  padding-inline-start: 18px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 /* -------------------- إشعارات منبثقة (Toasts) -------------------- */
 .toast {
   background: #1f2e2a;
