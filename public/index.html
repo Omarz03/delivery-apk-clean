@@ -356,10 +356,16 @@
 
       <!-- زرا الإضافة كملحق والتصدير -->
       <div class="flex justify-between items-center gap-3 flex-wrap">
-        <button id="appendixBtn" class="inline-flex items-center gap-2 bg-white hover:bg-paper border border-line transition-colors text-ink font-semibold text-sm px-4 py-3 rounded-xl">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          إضافة ملحق
-        </button>
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <button id="appendixBtn" class="inline-flex items-center gap-2 bg-white hover:bg-paper border border-line transition-colors text-ink font-semibold text-sm px-4 py-3 rounded-xl">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            إضافة ملحق
+          </button>
+          <button id="reportBtn" class="inline-flex items-center gap-2 bg-white hover:bg-paper border border-line transition-colors text-ink font-semibold text-sm px-4 py-3 rounded-xl" title="تقرير ختام الجلسة">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17V9M13 17v-5M17 17v-8M4 21h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1Z"/></svg>
+            تقرير الجلسة
+          </button>
+        </div>
         <button id="exportBtn" class="inline-flex items-center gap-2 bg-pine hover:bg-pineLight transition-colors text-white font-semibold text-sm px-5 py-3 rounded-xl">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" transform="rotate(180 12 12)"/></svg>
           تصدير كملف Excel
@@ -387,6 +393,9 @@
     <div class="flex-1 overflow-y-auto px-5 py-4">
       <!-- ملاحظة "تمت الإضافة كملحق" — تظهر فقط للسجلات المُضافة كملحق -->
       <p id="appendixAttribution" class="hidden text-xs font-medium text-clay bg-clay/10 border border-clay rounded-lg px-3 py-2 mb-4"></p>
+
+      <!-- تنبيه "احتمال تسليم مزدوج" — يظهر فقط لو سجل آخر بنفس رقم الهوية مُسلَّم فعلاً -->
+      <div id="duplicateWarning" class="hidden duplicate-warning"></div>
 
       <!-- بيانات الاستيراد الأصلية (للقراءة فقط) -->
       <div id="drawerOriginalData" class="grid grid-cols-1 gap-3 mb-6 text-sm">
@@ -431,6 +440,38 @@
       </button>
     </div>
   </aside>
+
+  <!-- ===================== نافذة تقرير ختام الجلسة ===================== -->
+  <div id="reportModalOverlay" class="drawer-overlay"></div>
+  <div id="reportModal" class="session-qr-modal" aria-hidden="true">
+    <div class="session-modal-inner">
+      <div class="session-modal-header">
+        <span class="session-modal-title">تقرير ختام الجلسة</span>
+        <button id="reportModalClose" class="session-modal-close" aria-label="إغلاق">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="session-modal-body">
+        <p id="reportGeneratedAt" class="text-xs text-ink/40 mb-4"></p>
+
+        <div id="reportStatsGrid" class="report-stats-grid">
+          <!-- تُبنى ديناميكياً في script.js -->
+        </div>
+
+        <div id="reportBreakdownWrap" class="hidden report-breakdown-wrap">
+          <p class="report-breakdown-title">تفصيل حسب <span id="reportBreakdownColumnName"></span></p>
+          <div class="overflow-x-auto">
+            <table class="report-breakdown-table" id="reportBreakdownTable"></table>
+          </div>
+        </div>
+
+        <button id="reportExportBtn" class="btn-primary w-full">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" transform="rotate(180 12 12)"/></svg>
+          تصدير التقرير كملف Excel
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
   <script src="webrtc-p2p.js"></script>
