@@ -37,13 +37,64 @@ async function generateQR(containerId, data) {
    ----------------------------------------------------------------------- */
 let activeScanner = null;
 
-async function startQRScan(videoContainerId) {
-  return new Promise((resolve, reject) => {
-    if (activeScanner) {
-      activeScanner.stop().catch(() => {});
-      activeScanner = null;
-    }
+/**
+ * يوقف الماسح الحالي (إن وُجد) وينتظر فعلياً اكتمال تحرير الكاميرا قبل
+ * السماح بأي طلب فتح كاميرا جديد. المشكلة التي عالجناها هنا: `stop()`
+ * الخاص بمكتبة html5-qrcode كان يُستدعى ولا يُنتظر (`.catch(() => {})` بلا
+ * await)، فيبدأ طلب فتح كاميرا جديد فوراً بينما نظام التشغيل (خصوصاً على
+ * أندرويد) لم يُحرّر جهاز الكاميرا فعلياً بعد — فيفشل الطلب الجديد بخطأ
+ * "الكاميرا مشغولة" (NotReadableError) بصمت، ويبدو الأمر وكأن "الاتصال"
+ * نفسه معطّل، بينما المشكلة فعلياً في مرحلة فتح الكاميرا التي تسبق أي
+ * تبادل WebRTC إطلاقاً. هذا يفسّر أيضاً لماذا يعمل الاتصال دائماً في أول
+ * محاولة بعد كل تحميل صفحة جديد (كاميرا "نظيفة" لم تُستخدم بعد)، ويفشل في
+ * أي محاولة لاحقة ضمن نفس تحميل الصفحة.
+ */
+async function _ensureScannerReleased() {
+  if (!activeScanner) return;
+  const scanner = activeScanner;
+  activeScanner = null;
+  try {
+    await scanner.stop();
+  } catch (e) {
+    console.warn('تعذّر إيقاف الماسح السابق بشكل نظيف (سنكمل رغم ذلك):', e);
+  }
+  try {
+    scanner.clear();
+  } catch (e) {
+    /* غير حرج */
+  }
+  // مهلة قصيرة إضافية: حتى لو نجح stop() فوراً، بعض الأجهزة تحتاج جزءاً من
+  // الثانية حتى يُحرَّر جهاز الكاميرا فعلياً على مستوى نظام التشغيل.
+  await new Promise((resolve) => setTimeout(resolve, 300));
+}
 
+/**
+ * يبدأ الماسح مع محاولة إضافية واحدة تلقائياً لو فشلت المحاولة الأولى
+ * تحديداً بخطأ "كاميرا مشغولة" (شائع جداً مباشرة بعد إيقاف مسح سابق).
+ */
+function _startScannerWithRetry(scanner, config, onDecoded, onError, retriesLeft = 2) {
+  return scanner
+    .start({ facingMode: 'environment' }, config, onDecoded, onError)
+    .catch((err) => {
+      const message = String(err?.message || err || '');
+      const isBusyError = /NotReadable|TrackStartError|already under way|busy/i.test(message);
+      if (retriesLeft > 0 && isBusyError) {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            _startScannerWithRetry(scanner, config, onDecoded, onError, retriesLeft - 1)
+              .then(resolve)
+              .catch(reject);
+          }, 400);
+        });
+      }
+      throw err;
+    });
+}
+
+async function startQRScan(videoContainerId) {
+  await _ensureScannerReleased();
+
+  return new Promise((resolve, reject) => {
     activeScanner = new Html5Qrcode(videoContainerId);
 
     const config = {
@@ -52,8 +103,8 @@ async function startQRScan(videoContainerId) {
       aspectRatio: 1.0,
     };
 
-    activeScanner.start(
-      { facingMode: 'environment' }, // الكاميرا الخلفية
+    _startScannerWithRetry(
+      activeScanner,
       config,
       (decodedText) => {
         activeScanner.stop().then(() => {
@@ -71,8 +122,9 @@ async function startQRScan(videoContainerId) {
 
 function stopQRScan() {
   if (activeScanner) {
-    activeScanner.stop().catch(() => {});
+    const scanner = activeScanner;
     activeScanner = null;
+    scanner.stop().catch(() => {});
   }
 }
 
@@ -155,21 +207,18 @@ function startAnimatedQR(containerId, payloadStr, options = {}) {
  * @param {{ onProgress?: (received: number, total: number) => void }} [options]
  * @returns {Promise<string>} النص الكامل المُعاد تجميعه
  */
-function startAnimatedQRScan(videoContainerId, options = {}) {
+async function startAnimatedQRScan(videoContainerId, options = {}) {
   const { onProgress } = options;
 
-  return new Promise((resolve, reject) => {
-    if (activeScanner) {
-      activeScanner.stop().catch(() => {});
-      activeScanner = null;
-    }
+  await _ensureScannerReleased();
 
+  return new Promise((resolve, reject) => {
     activeScanner = new Html5Qrcode(videoContainerId);
     const config = { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 };
     const buffers = new Map(); // transferId → مصفوفة القطع
 
-    activeScanner.start(
-      { facingMode: 'environment' },
+    _startScannerWithRetry(
+      activeScanner,
       config,
       (decodedText) => {
         let parsed;
