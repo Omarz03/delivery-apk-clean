@@ -26,6 +26,11 @@ let openRecordId = null;
 let socket = null;       // legacy — kept for compatibility; actual sync via window.deliveryP2P
 let deviceId = null;
 let deviceName = null;   // اسم مبسّط يُعرض لبقية الأجهزة (مثال: "موبايل • a1b2")
+// نسخة في الذاكرة من عمود المعرّف الفريد (مثل "رقم الهوية") المحفوظ في meta،
+// حتى نقدر نستخدمه بشكل متزامن (sync) في فحص "التسليم المزدوج" أثناء التفاعل
+// مع الواجهة دون الحاجة لقراءة IndexedDB في كل مرة. تُحدَّث عند init وعند
+// كل استيراد جديد يحدد عمود معرّف (finalizeImport).
+let identifierColumnCache = null;
 const lockedRecords = new Map(); // syncId → { deviceId, deviceName, expiresAt } لسجلات يعدّلها جهاز آخر الآن
 let lockExpiryTimers = new Map(); // syncId → معرّف setTimeout محلي لفكّ القفل احتياطياً بعد 30 ثانية
 
@@ -196,6 +201,7 @@ const el = {
   notesInput: document.getElementById('notesInput'),
   deliveryAttribution: document.getElementById('deliveryAttribution'),
   appendixAttribution: document.getElementById('appendixAttribution'),
+  duplicateWarning: document.getElementById('duplicateWarning'),
   syncDot: document.getElementById('syncDot'),
   syncLabel: document.getElementById('syncLabel'),
   syncMessage: document.getElementById('syncMessage'),
@@ -238,6 +244,17 @@ const el = {
   appendixFileInput: document.getElementById('appendixFileInput'),
   appendixTemplateBtn: document.getElementById('appendixTemplateBtn'),
   appendixExcelStatus: document.getElementById('appendixExcelStatus'),
+  // نافذة تقرير ختام الجلسة
+  reportBtn: document.getElementById('reportBtn'),
+  reportModal: document.getElementById('reportModal'),
+  reportModalOverlay: document.getElementById('reportModalOverlay'),
+  reportModalClose: document.getElementById('reportModalClose'),
+  reportGeneratedAt: document.getElementById('reportGeneratedAt'),
+  reportStatsGrid: document.getElementById('reportStatsGrid'),
+  reportBreakdownWrap: document.getElementById('reportBreakdownWrap'),
+  reportBreakdownColumnName: document.getElementById('reportBreakdownColumnName'),
+  reportBreakdownTable: document.getElementById('reportBreakdownTable'),
+  reportExportBtn: document.getElementById('reportExportBtn'),
 };
 
 /* -------------------------------------------------------------------------
@@ -289,6 +306,55 @@ function hashRowContent(row, columns) {
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16);
+}
+
+/* -------------------------------------------------------------------------
+   كشف "التسليم المزدوج" — حماية نزاهة التوزيع
+   -------------------------------------------------------------------------
+   يعتمد على قيمة عمود المعرّف الفريد (رقم الهوية) نفسها، وليس __syncId،
+   لأن سجلّين قد يحملان نفس رقم الهوية لكن معرّفي مزامنة مختلفين — أشهر
+   حالة: نفس الهوية تكررت داخل ملف الإكسل الأصلي، فالصف الثاني يأخذ
+   __syncId احتياطياً (content hash) بدل الاصطدام بالأول (راجع finalizeImport)،
+   فيصيران سجلّين منفصلين قابلين للتسليم كلٌّ على حدة دون هذا الفحص.
+   ------------------------------------------------------------------------- */
+
+/**
+ * يبحث عن سجلات أخرى (غير السجل الممرَّر) تحمل نفس قيمة عمود المعرّف
+ * الفريد وهي مُعلَّمة "تم الاستلام" فعلاً حالياً — بغض النظر إن كانت من
+ * البيانات الأصلية أو أُضيفت كملحق. يعيد مصفوفة فارغة إن لم يتوفر عمود
+ * معرّف موثوق لهذه الجلسة، أو كانت قيمته فارغة لهذا السجل تحديداً.
+ * @param {Object} record
+ * @returns {Array<Object>}
+ */
+function findDuplicateDeliveries(record) {
+  if (!identifierColumnCache) return [];
+  const key = normalizeIdValue(record[identifierColumnCache]);
+  if (!key) return [];
+  return allRecords.filter(
+    (r) =>
+      r.id !== record.id &&
+      r.__status === true &&
+      normalizeIdValue(r[identifierColumnCache]) === key
+  );
+}
+
+/**
+ * يبحث ضمن دفعة صفوف (وقت الاستيراد، قبل أي حفظ) عن قيم معرّف مكررة —
+ * يُستخدم لإظهار تنبيه واضح بالقيم الفعلية المكررة بدل رقم الصف فقط،
+ * حتى يقدر المستخدم يتحقق من ملف المصدر مباشرة.
+ * @returns {Array<string>} قيم المعرّف المكررة (بلا تكرار بالنتيجة نفسها)
+ */
+function findDuplicateIdValuesInRows(rows, identifierColumn) {
+  if (!identifierColumn) return [];
+  const seen = new Set();
+  const duplicates = new Set();
+  rows.forEach((row) => {
+    const key = normalizeIdValue(row[identifierColumn]);
+    if (!key) return;
+    if (seen.has(key)) duplicates.add(String(row[identifierColumn]).trim());
+    seen.add(key);
+  });
+  return Array.from(duplicates);
 }
 
 /**
@@ -821,6 +887,7 @@ async function finalizeImport(rows, columns, identifierColumn, fileName) {
 
   await replaceAllRecords(preparedRecords, columns);
   if (identifierColumn) await setMeta('identifierColumn', identifierColumn);
+  identifierColumnCache = identifierColumn || null;
 
   allColumns = columns;
   allRecords = await getAllRecords();
@@ -835,7 +902,13 @@ async function finalizeImport(rows, columns, identifierColumn, fileName) {
     statusMessage += ` (المعرّف الفريد: عمود "${identifierColumn}")`;
   }
   if (usedFallbackIds.length > 0) {
-    statusMessage += ` تنبيه: ${usedFallbackIds.length} صف بدون معرّف موثوق (قيمة فارغة أو مكررة) — قد يتكرر عند إعادة الاستيراد لاحقاً.`;
+    const duplicateValues = findDuplicateIdValuesInRows(rows, identifierColumn);
+    const sample = duplicateValues.slice(0, 5).join('، ');
+    statusMessage += ` ⚠ تنبيه: ${usedFallbackIds.length} صف بمعرّف فارغ أو مكرر داخل الملف نفسه`;
+    if (duplicateValues.length > 0) {
+      statusMessage += ` — من ضمنها قيم مكررة: ${sample}${duplicateValues.length > 5 ? ' وغيرها...' : ''}`;
+      statusMessage += `. يُنصح بمراجعة الملف الأصلي لتفادي احتمال تسليم مزدوج لنفس الشخص.`;
+    }
   }
   setImportStatus(statusMessage, usedFallbackIds.length > 0 ? 'neutral' : 'success');
 
@@ -1187,6 +1260,42 @@ function renderAppendixAttribution(record) {
   el.appendixAttribution.classList.remove('hidden');
 }
 
+/**
+ * يعرض تنبيه "احتمال تسليم مزدوج" أعلى النافذة الجانبية إن وُجدت سجلات
+ * أخرى بنفس رقم الهوية مُعلَّمة "تم الاستلام" فعلاً. يُستدعى عند فتح
+ * النافذة وعند كل تبديل لمفتاح حالة الاستلام، حتى يبقى التحذير محدَّثاً
+ * ومرئياً *قبل* أن يضغط المستخدم "حفظ".
+ * @param {Array<Object>} matches نتيجة findDuplicateDeliveries
+ */
+function renderDuplicateWarning(matches) {
+  if (!el.duplicateWarning) return;
+
+  if (!matches || matches.length === 0) {
+    el.duplicateWarning.classList.add('hidden');
+    el.duplicateWarning.innerHTML = '';
+    return;
+  }
+
+  const items = matches
+    .slice(0, 4)
+    .map((m) => {
+      const receiver = escapeHtml(m.__receiver || 'غير محدد');
+      const time = escapeHtml(formatDeliveryTimestamp(m.__deliveredAt));
+      const by = escapeHtml(m.__deliveredByName || 'غير معروف');
+      const tag = m.__isAppendix ? ' <span style="opacity:.7">(ملحق)</span>' : '';
+      return `<li>استلمه <b>${receiver}</b>${tag} بتاريخ ${time} — سجّله ${by}</li>`;
+    })
+    .join('');
+  const more = matches.length > 4 ? `<li>و${matches.length - 4} حالة أخرى مطابقة...</li>` : '';
+
+  el.duplicateWarning.innerHTML = `
+    <strong>⚠ احتمال تسليم مزدوج لنفس الشخص</strong>
+    نفس رقم الهوية مُسجَّل "تم الاستلام" مسبقاً بسجل آخر بهذا الجدول:
+    <ul>${items}${more}</ul>
+  `;
+  el.duplicateWarning.classList.remove('hidden');
+}
+
 function openDrawer(id) {
   const record = allRecords.find((r) => r.id === id);
   if (!record) return;
@@ -1209,6 +1318,7 @@ function openDrawer(id) {
   el.notesInput.value = record.__notes || '';
   renderDeliveryAttribution(record);
   renderAppendixAttribution(record);
+  renderDuplicateWarning(findDuplicateDeliveries(record));
 
   el.drawer.classList.add('open');
   el.drawer.setAttribute('aria-hidden', 'false');
@@ -1305,6 +1415,20 @@ el.drawerSave.addEventListener('click', async () => {
   // "تم الاستلام" (تصحيح خطأ)، نمسح النسبة لتبقى متسقة مع الحالة الفعلية.
   const wasDelivered = record.__status === true;
   if (statusChecked && !wasDelivered) {
+    // فحص أخير قبل الحفظ الفعلي: لو فيه سجل آخر بنفس رقم الهوية "تم
+    // استلامه" فعلاً، نوقف الحفظ ونطلب تأكيداً صريحاً — حماية أخيرة حتى لو
+    // فات المستخدم التنبيه المرئي أعلى النافذة.
+    const duplicates = findDuplicateDeliveries(record);
+    if (duplicates.length > 0) {
+      const details = duplicates
+        .slice(0, 4)
+        .map((m) => `- ${m.__receiver || 'غير محدد'} (${formatDeliveryTimestamp(m.__deliveredAt)})`)
+        .join('\n');
+      const proceed = window.confirm(
+        `⚠ تنبيه: احتمال تسليم مزدوج\n\nنفس رقم الهوية مُسجَّل "تم الاستلام" مسبقاً:\n${details}\n\nهل تريد تأكيد تسليم هذا السجل رغم ذلك؟`
+      );
+      if (!proceed) return; // نوقف الحفظ بالكامل — السجل يبقى كما كان دون أي تغيير
+    }
     updated.__deliveredByName = deviceName || 'غير معروف';
     updated.__deliveredByDeviceId = deviceId || null;
     updated.__deliveredAt = Date.now();
@@ -1358,6 +1482,168 @@ el.exportBtn.addEventListener('click', () => {
 
   const today = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(workbook, `تسليم_محدث_${today}.xlsx`);
+});
+
+/* -------------------------------------------------------------------------
+   9.1) تقرير ختام الجلسة/اليوم
+   -------------------------------------------------------------------------
+   ملخّص سريع (وقابل للتصدير كملف إكسل منفصل وخفيف) لحالة التسليم الحالية:
+   إجمالي/تم/متبقي/نسبة، عدد سجلات الملحق وكم منها سُلِّم، وتفصيل حسب عمود
+   "منطقة/مخيم/قطاع" إن اكتُشف تلقائياً بين أعمدة الملف المستورد. يفيد عند
+   تسليم التقرير اليومي للمكتب دون تصدير واستعراض الجدول الكامل يدوياً.
+   ------------------------------------------------------------------------- */
+
+/**
+ * يحاول اكتشاف عمود "تصنيف جغرافي" (منطقة/مخيم/قطاع...) من بين أعمدة
+ * الملف المستورد، لاستخدامه كأساس لتفصيل التقرير. يعيد null إن لم يجد
+ * عموداً مناسباً — عندها يعرض التقرير الإجماليات فقط بدون جدول تفصيلي.
+ */
+function detectBreakdownColumn(columns) {
+  const hints = /(منطق|مخيم|قطاع|تجمع|حي\b|قرية|block|camp|area|zone|region|sector|district)/i;
+  return columns.find((col) => hints.test(col)) || null;
+}
+
+/** يبني كل أرقام تقرير ختام الجلسة اعتماداً على allRecords الحالية. */
+function computeSessionReport() {
+  const total = allRecords.length;
+  const delivered = allRecords.filter((r) => r.__status).length;
+  const pending = total - delivered;
+  const percent = total > 0 ? Math.round((delivered / total) * 100) : 0;
+
+  const appendixRecords = allRecords.filter((r) => r.__isAppendix);
+  const appendixDelivered = appendixRecords.filter((r) => r.__status).length;
+
+  const breakdownColumn = detectBreakdownColumn(allColumns);
+  let breakdown = null;
+  if (breakdownColumn) {
+    const groups = new Map();
+    allRecords.forEach((r) => {
+      const key = String(r[breakdownColumn] ?? '').trim() || 'غير محدد';
+      if (!groups.has(key)) groups.set(key, { total: 0, delivered: 0 });
+      const g = groups.get(key);
+      g.total += 1;
+      if (r.__status) g.delivered += 1;
+    });
+    breakdown = {
+      column: breakdownColumn,
+      // ترتيب تنازلي حسب الإجمالي — أكبر منطقة أولاً، أسهل للمراجعة السريعة
+      groups: Array.from(groups.entries()).sort((a, b) => b[1].total - a[1].total),
+    };
+  }
+
+  const deliveredTimestamps = allRecords.filter((r) => r.__deliveredAt).map((r) => r.__deliveredAt);
+  const firstDeliveryAt = deliveredTimestamps.length ? Math.min(...deliveredTimestamps) : null;
+  const lastDeliveryAt = deliveredTimestamps.length ? Math.max(...deliveredTimestamps) : null;
+
+  return {
+    total,
+    delivered,
+    pending,
+    percent,
+    appendixCount: appendixRecords.length,
+    appendixDelivered,
+    breakdown,
+    firstDeliveryAt,
+    lastDeliveryAt,
+  };
+}
+
+/** يملأ محتوى نافذة تقرير ختام الجلسة بأرقام محدَّثة، وقت كل فتح. */
+function renderSessionReport() {
+  const r = computeSessionReport();
+
+  const now = new Date();
+  el.reportGeneratedAt.textContent = `تم إنشاء هذا التقرير في ${now.toLocaleDateString('ar-EG')} — ${now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`;
+
+  const cards = [
+    { label: 'إجمالي المستفيدين', value: r.total, cls: '' },
+    { label: 'تم التسليم', value: r.delivered, cls: 'is-positive' },
+    { label: 'متبقي', value: r.pending, cls: 'is-pending' },
+    { label: 'نسبة الإنجاز', value: `${r.percent}%`, cls: '' },
+  ];
+  if (r.appendixCount > 0) {
+    cards.push({ label: 'أُضيفوا كملحق', value: r.appendixCount, cls: '' });
+    cards.push({ label: 'ملحق تم تسليمه', value: r.appendixDelivered, cls: 'is-positive' });
+  }
+  el.reportStatsGrid.innerHTML = cards
+    .map(
+      (c) => `
+    <div class="report-stat-card ${c.cls}">
+      <span class="report-stat-value">${escapeHtml(String(c.value))}</span>
+      <span class="report-stat-label">${escapeHtml(c.label)}</span>
+    </div>`
+    )
+    .join('');
+
+  if (r.breakdown && r.breakdown.groups.length > 0) {
+    el.reportBreakdownColumnName.textContent = r.breakdown.column;
+    el.reportBreakdownTable.innerHTML = `
+      <thead>
+        <tr><th>${escapeHtml(r.breakdown.column)}</th><th>تم</th><th>الإجمالي</th><th>النسبة</th></tr>
+      </thead>
+      <tbody>
+        ${r.breakdown.groups
+          .map(([key, g]) => {
+            const pct = g.total > 0 ? Math.round((g.delivered / g.total) * 100) : 0;
+            return `<tr><td>${escapeHtml(key)}</td><td>${g.delivered}</td><td>${g.total}</td><td>${pct}%</td></tr>`;
+          })
+          .join('')}
+      </tbody>`;
+    el.reportBreakdownWrap.classList.remove('hidden');
+  } else {
+    el.reportBreakdownWrap.classList.add('hidden');
+    el.reportBreakdownTable.innerHTML = '';
+  }
+}
+
+function openReportModal() {
+  if (allRecords.length === 0) return;
+  renderSessionReport();
+  el.reportModal.classList.add('open');
+  el.reportModal.setAttribute('aria-hidden', 'false');
+  el.reportModalOverlay.classList.add('open');
+}
+
+function closeReportModal() {
+  el.reportModal.classList.remove('open');
+  el.reportModal.setAttribute('aria-hidden', 'true');
+  el.reportModalOverlay.classList.remove('open');
+}
+
+el.reportBtn?.addEventListener('click', openReportModal);
+el.reportModalClose?.addEventListener('click', closeReportModal);
+el.reportModalOverlay?.addEventListener('click', closeReportModal);
+
+/** يصدّر ملخّص التقرير كملف إكسل خفيف منفصل (ورقة إجماليات + ورقة تفصيل حسب المنطقة إن وُجدت). */
+el.reportExportBtn?.addEventListener('click', () => {
+  const r = computeSessionReport();
+
+  const summaryRows = [
+    { البند: 'إجمالي المستفيدين', القيمة: r.total },
+    { البند: 'تم التسليم', القيمة: r.delivered },
+    { البند: 'متبقي', القيمة: r.pending },
+    { البند: 'نسبة الإنجاز', القيمة: `${r.percent}%` },
+    { البند: 'أُضيفوا كملحق خلال الجلسة', القيمة: r.appendixCount },
+    { البند: 'ملحق تم تسليمه', القيمة: r.appendixDelivered },
+    { البند: 'أول عملية تسليم', القيمة: formatDeliveryTimestamp(r.firstDeliveryAt) },
+    { البند: 'آخر عملية تسليم', القيمة: formatDeliveryTimestamp(r.lastDeliveryAt) },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'ملخص الجلسة');
+
+  if (r.breakdown && r.breakdown.groups.length > 0) {
+    const breakdownRows = r.breakdown.groups.map(([key, g]) => ({
+      [r.breakdown.column]: key,
+      'تم التسليم': g.delivered,
+      'الإجمالي': g.total,
+      'نسبة الإنجاز': g.total > 0 ? `${Math.round((g.delivered / g.total) * 100)}%` : '0%',
+    }));
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(breakdownRows), `حسب ${r.breakdown.column}`.slice(0, 31));
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(workbook, `تقرير_ختام_الجلسة_${today}.xlsx`);
 });
 
 /* -------------------------------------------------------------------------
@@ -1871,6 +2157,7 @@ function setupBackButtonGuard() {
     db = await openDatabase();
     allColumns = (await getMeta('columns')) || [];
     allRecords = await getAllRecords();
+    identifierColumnCache = (await getMeta('identifierColumn')) || null;
     renderApp();
 
     await ensureDeviceIdentity();
