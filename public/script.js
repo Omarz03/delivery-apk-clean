@@ -254,7 +254,6 @@ const el = {
   reportBreakdownWrap: document.getElementById('reportBreakdownWrap'),
   reportBreakdownColumnName: document.getElementById('reportBreakdownColumnName'),
   reportBreakdownTable: document.getElementById('reportBreakdownTable'),
-  reportExportBtn: document.getElementById('reportExportBtn'),
 };
 
 /* -------------------------------------------------------------------------
@@ -1480,6 +1479,10 @@ el.exportBtn.addEventListener('click', () => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'المستفيدين');
 
+  // ورقة "تقرير الجلسة" تُضاف تلقائياً كجزء من نفس ملف التصدير النهائي —
+  // بلا حاجة لتصدير منفصل، فالمكتب يستلم كل شيء بملف واحد.
+  appendSessionReportSheets(workbook);
+
   const today = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(workbook, `تسليم_محدث_${today}.xlsx`);
 });
@@ -1613,9 +1616,21 @@ function closeReportModal() {
 el.reportBtn?.addEventListener('click', openReportModal);
 el.reportModalClose?.addEventListener('click', closeReportModal);
 el.reportModalOverlay?.addEventListener('click', closeReportModal);
+// الضغط في أي مكان خارج بطاقة النافذة (المساحة الفارغة حول الصندوق) يُغلقها
+// أيضاً — نتحقق أن الهدف الفعلي للضغطة هو الحاوية الخارجية نفسها وليس أي
+// عنصر داخلي (وإلا كان أي ضغط داخل النافذة سيُغلقها بالخطأ عبر الفقاعة).
+el.reportModal?.addEventListener('click', (event) => {
+  if (event.target === el.reportModal) closeReportModal();
+});
 
-/** يصدّر ملخّص التقرير كملف إكسل خفيف منفصل (ورقة إجماليات + ورقة تفصيل حسب المنطقة إن وُجدت). */
-el.reportExportBtn?.addEventListener('click', () => {
+/**
+ * يضيف ورقة/ورقتَي "تقرير الجلسة" (ملخّص + تفصيل حسب المنطقة إن وُجدت) إلى
+ * ملف Excel الذي يُصدَّر بالفعل من زر "تصدير كملف Excel" الرئيسي — بدل ملف
+ * منفصل، حتى يستلم المكتب كل شيء (بيانات المستفيدين + ملخّص الجلسة) بملف
+ * واحد جاهز.
+ * @param {XLSX.WorkBook} workbook
+ */
+function appendSessionReportSheets(workbook) {
   const r = computeSessionReport();
 
   const summaryRows = [
@@ -1628,9 +1643,7 @@ el.reportExportBtn?.addEventListener('click', () => {
     { البند: 'أول عملية تسليم', القيمة: formatDeliveryTimestamp(r.firstDeliveryAt) },
     { البند: 'آخر عملية تسليم', القيمة: formatDeliveryTimestamp(r.lastDeliveryAt) },
   ];
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'ملخص الجلسة');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'تقرير الجلسة');
 
   if (r.breakdown && r.breakdown.groups.length > 0) {
     const breakdownRows = r.breakdown.groups.map(([key, g]) => ({
@@ -1641,10 +1654,7 @@ el.reportExportBtn?.addEventListener('click', () => {
     }));
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(breakdownRows), `حسب ${r.breakdown.column}`.slice(0, 31));
   }
-
-  const today = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(workbook, `تقرير_ختام_الجلسة_${today}.xlsx`);
-});
+}
 
 /* -------------------------------------------------------------------------
    نافذة "إضافة ملحق" — التفاعل مع الواجهة
