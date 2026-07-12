@@ -775,16 +775,17 @@ el.fileInput.addEventListener('change', async (event) => {
 
 /**
  * تبني معرّف مزامنة (__syncId) لسجل ملحق جديد بنفس منطق الاستيراد الأساسي
- * تمامًا (عمود المعرّف المحفوظ إن وُجد، وإلا hash لمحتوى الصف)، مع تفادي أي
- * تصادم مع معرّفات موجودة فعلاً (محلياً أو ضمن نفس دفعة الإضافة).
+ * تماماً (عمود المعرّف المحفوظ إن وُجد، وإلا hash لمحتوى الصف).
+ * مهم: لا تتحقق من وجود تصادم هنا ولا "تتحايل" عليه بمعرّف بديل — تعيد
+ * دائماً المعرّف المبني على عمود الهوية إن توفّر، وتترك اكتشاف التصادم فعلياً
+ * لـ addAppendixRecords (التي تقارنه بـ existingSyncIds). النسخة السابقة
+ * كانت تولّد معرّفاً بديلاً (content hash) فور اكتشاف تصادم بدل التبليغ عنه،
+ * مما كان يُسقط فحص "رفض المكرر" بالكامل ويُدخل السجل المكرر بصمت.
  */
-function buildAppendixSyncId(row, columns, identifierColumn, existingSyncIds) {
+function buildAppendixSyncId(row, columns, identifierColumn) {
   if (identifierColumn) {
     const key = normalizeIdValue(row[identifierColumn]);
-    if (key) {
-      const candidate = `key:${identifierColumn}:${key}`;
-      if (!existingSyncIds.has(candidate)) return candidate;
-    }
+    if (key) return `key:${identifierColumn}:${key}`;
   }
   return `content:${hashRowContent(row, columns)}`;
 }
@@ -831,7 +832,7 @@ async function addAppendixRecords(rawRows) {
       nextNumber += 1;
     }
 
-    const syncId = buildAppendixSyncId(normalizedRow, allColumns, identifierColumn, existingSyncIds);
+    const syncId = buildAppendixSyncId(normalizedRow, allColumns, identifierColumn);
     if (existingSyncIds.has(syncId)) {
       skipped += 1; // نفس الشخص مضاف مسبقاً (نفس عمود المعرّف) — نتجاهله بدل تكراره
       if (identifierColumn && normalizedRow[identifierColumn]) {
