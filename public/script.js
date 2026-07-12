@@ -2119,18 +2119,57 @@ function setupBackButtonGuard() {
 
   // --- الحالة 1: تطبيق أندرويد أصلي (APK) عبر Capacitor ---
   // نتحقق فعلياً أننا داخل منصة أصلية وليس مجرد وجود stub ويب وهمي لـ
-  // Capacitor (المعرّف في index.html للتوافق على الويب) — isCapacitor وحدها
-  // لا تكفي لأن الـ stub يعرّف window.Capacitor دائماً.
-  const isNative = window.Capacitor?.getPlatform?.() !== 'web';
-  const appPlugin = window.Capacitor?.Plugins?.App;
-  if (isNative && appPlugin && typeof appPlugin.addListener === 'function') {
-    appPlugin.addListener('backButton', () => {
-      if (shouldExitNow()) appPlugin.exitApp();
-    });
+  // Capacitor (المعرّف في index.html للتوافق على الويب) — نفضّل
+  // isNativePlatform() (الطريقة الرسمية الموصى بها بتوثيق Capacitor) على
+  // مقارنة getPlatform() يدوياً وحدها.
+  const isNative = window.Capacitor?.isNativePlatform?.() ?? (window.Capacitor?.getPlatform?.() !== 'web');
+
+  if (isNative) {
+    // ملاحظة مهمة جداً: على أندرويد الحقيقي (APK)، الاعتماد على
+    // history.pushState/popstate (فرع "الحالة 2" أدناه) لا يعمل إطلاقاً
+    // لاعتراض زر الرجوع الفعلي بالجهاز — هذا الزر حدث نظام أندرويد أصلي
+    // (Activity.onBackPressed) ولا علاقة له بتاريخ تصفح الصفحة، فلا يُطلق
+    // popstate مطلقاً بدون تدخّل Capacitor نفسها. المسار الوحيد الفعّال هو
+    // مكوّن Capacitor's App وحدث backButton الخاص به. إن فشلنا بالوصول له،
+    // زر الرجوع سيُغلق التطبيق فوراً بسلوك أندرويد الافتراضي — بالضبط ما
+    // كان يحصل قبل هذا الإصلاح.
+    //
+    // المشكلة الفعلية التي عالجناها هنا: عند بدء تشغيل الصفحة، جسر
+    // Capacitor (bridge) وتسجيل الإضافات (plugins) قد لا يكون جاهزاً تماماً
+    // باللحظة التي يُنفَّذ فيها هذا الكود (خصوصاً على أجهزة أبطأ أو عند فتح
+    // التطبيق بارداً) — فحص واحد فوري كان يفشل صامتاً (appPlugin=undefined)
+    // ويسقط الكود بالخطأ لفرع popstate غير الفعّال إطلاقاً على أندرويد، فيصير
+    // زر الرجوع بلا أي اعتراض ويُغلق التطبيق مباشرة بضغطة واحدة بلا تحذير —
+    // بالضبط العرض المُبلَّغ عنه. الآن نعيد المحاولة عدة مرات بمهلة قصيرة
+    // قبل الاستسلام.
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10;
+    const RETRY_DELAY_MS = 300;
+
+    const tryAttach = () => {
+      const appPlugin = window.Capacitor?.Plugins?.App;
+      if (appPlugin && typeof appPlugin.addListener === 'function') {
+        appPlugin.addListener('backButton', () => {
+          if (shouldExitNow()) appPlugin.exitApp();
+        });
+        return;
+      }
+      attempts += 1;
+      if (attempts < MAX_ATTEMPTS) {
+        setTimeout(tryAttach, RETRY_DELAY_MS);
+      } else {
+        console.warn(
+          'تعذّر العثور على إضافة Capacitor App بعد عدة محاولات — تأكد أن ' +
+          '@capacitor/app مضافة بالمشروع وتم تشغيل "npx cap sync android". ' +
+          'زر الرجوع سيعمل بسلوك أندرويد الافتراضي (خروج فوري بلا تحذير) حتى يُحل هذا.'
+        );
+      }
+    };
+    tryAttach();
     return;
   }
 
-  // --- الحالة 2: PWA/صفحة ويب عادية (الوضع الحالي فعلياً) ---
+  // --- الحالة 2: PWA/صفحة ويب عادية (تصفح مباشر عبر Chrome، وليس APK) ---
   // زر رجوع أندرويد هنا يُترجَم لحدث popstate على تاريخ المتصفح. نضيف حالة
   // وهمية بالتاريخ عند التحميل؛ كل ضغطة رجوع "تستهلك" هذه الحالة فتُطلق
   // popstate بدل الخروج مباشرة من الصفحة/التطبيق — فنعترضها هنا ونقرر.
