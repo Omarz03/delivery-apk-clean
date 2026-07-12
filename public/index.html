@@ -180,6 +180,13 @@
           <input id="appendixFileInput" type="file" accept=".xlsx,.xls" class="hidden" />
         </label>
         <p id="appendixExcelStatus" class="text-xs mt-3 font-medium text-ink/50"></p>
+        <!-- تفصيل الهويات المرفوضة (٥ أو أقل) — عرض مباشر بدون حاجة لتنزيل ملف -->
+        <div id="appendixDuplicatesList" class="hidden duplicate-warning" style="margin-top:10px;"></div>
+        <!-- أكثر من ٥ هويات مرفوضة — تنزيل بدل عرض قائمة طويلة داخل النافذة -->
+        <button id="appendixDuplicatesDownloadBtn" type="button" class="hidden w-full flex items-center justify-center gap-2 bg-white hover:bg-paper transition-colors text-clay font-semibold text-sm py-2.5 rounded-xl border border-clay mt-3">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
+          تنزيل ملف الأخطاء (الهويات المكررة)
+        </button>
       </div>
     </div>
   </div>
