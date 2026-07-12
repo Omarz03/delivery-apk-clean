@@ -245,6 +245,8 @@ const el = {
   appendixFileInput: document.getElementById('appendixFileInput'),
   appendixTemplateBtn: document.getElementById('appendixTemplateBtn'),
   appendixExcelStatus: document.getElementById('appendixExcelStatus'),
+  appendixDuplicatesList: document.getElementById('appendixDuplicatesList'),
+  appendixDuplicatesDownloadBtn: document.getElementById('appendixDuplicatesDownloadBtn'),
   // نافذة تقرير ختام الجلسة
   reportBtn: document.getElementById('reportBtn'),
   reportModal: document.getElementById('reportModal'),
@@ -806,7 +808,7 @@ function getNextAppendixNumber(numberColumn) {
 }
 
 async function addAppendixRecords(rawRows) {
-  if (!rawRows.length) return { added: 0, skipped: 0, duplicateValues: [] };
+  if (!rawRows.length) return { added: 0, skipped: 0, duplicateValues: [], duplicateDetails: [] };
 
   const identifierColumn = (await getMeta('identifierColumn')) || null;
   // العمود الأول غالباً ما يكون عمود الترقيم التسلسلي بالملف الأصلي — نولّده
@@ -815,9 +817,14 @@ async function addAppendixRecords(rawRows) {
   const numberColumn = allColumns[0] || null;
   let nextNumber = numberColumn ? getNextAppendixNumber(numberColumn) : null;
   const existingSyncIds = new Set(allRecords.map((r) => r.__syncId));
+  // خريطة syncId → السجل الفعلي، تُستخدم لعرض بيانات "السجل السابق" الذي
+  // تعارض معه كل صف مرفوض (تشمل سجلات مقبولة حديثاً ضمن نفس هذه الدفعة،
+  // حتى تُكتشف التكرارات الداخلية بنفس الملف بشكل صحيح).
+  const recordsBySyncId = new Map(allRecords.map((r) => [r.__syncId, r]));
   const now = Date.now();
   let skipped = 0;
   const duplicateValues = []; // قيم المعرّف الفعلية المرفوضة — لعرضها للمستخدم بدل رقم مجرّد
+  const duplicateDetails = []; // { row, existing } — لتصدير ملف الأخطاء عند الحاجة
 
   const newRecords = [];
   for (const row of rawRows) {
@@ -838,6 +845,7 @@ async function addAppendixRecords(rawRows) {
       if (identifierColumn && normalizedRow[identifierColumn]) {
         duplicateValues.push(String(normalizedRow[identifierColumn]).trim());
       }
+      duplicateDetails.push({ row: normalizedRow, existing: recordsBySyncId.get(syncId) || null });
       if (numberColumn) nextNumber -= 1; // نتراجع عن الرقم حتى لا تظهر فجوة بالترقيم
       continue;
     }
@@ -858,6 +866,7 @@ async function addAppendixRecords(rawRows) {
     const localId = await addSingleRecord(record);
     const saved = { ...record, id: localId };
     allRecords.push(saved);
+    recordsBySyncId.set(syncId, saved);
     newRecords.push(saved);
   }
 
@@ -869,7 +878,7 @@ async function addAppendixRecords(rawRows) {
     newRecords.forEach((r) => broadcastRecordUpdate(r));
   }
 
-  return { added: newRecords.length, skipped, duplicateValues };
+  return { added: newRecords.length, skipped, duplicateValues, duplicateDetails };
 }
 
 async function finalizeImport(rows, columns, identifierColumn, fileName) {
@@ -1686,6 +1695,9 @@ function openAppendixModal() {
   setAppendixMode('individual');
   renderAppendixForm();
   el.appendixExcelStatus.textContent = '';
+  el.appendixDuplicatesList?.classList.add('hidden');
+  if (el.appendixDuplicatesList) el.appendixDuplicatesList.innerHTML = '';
+  el.appendixDuplicatesDownloadBtn?.classList.add('hidden');
   // تصفير حالة تحذير التكرار من فتحة سابقة — الحقول تُبنى من جديد، لكن زر
   // "إضافة" وصندوق التحذير عنصران ثابتان بالـ HTML فلا يُعاد إنشاؤهما.
   el.appendixIdWarning?.classList.add('hidden');
@@ -1821,6 +1833,77 @@ el.appendixIndividualSubmit?.addEventListener('click', async () => {
   }
 });
 
+/**
+ * تعرض نتيجة استيراد ملف الملحق للمستخدم: رسالة واضحة، وقائمة الهويات
+ * المرفوضة كاملةً (النافذة تدعم سكرول عمودي طبيعي فلا حاجة لعتبة عدد)، إلى
+ * جانب زر تنزيل ملف الأخطاء دائماً كخيار إضافي — بغض النظر عن العدد. لا
+ * تُغلق النافذة تلقائياً إطلاقاً إن وُجد أي خطأ، فقط عند نجاح الاستيراد
+ * بالكامل بلا أي رفض.
+ */
+function renderAppendixDuplicatesResult({ added, skipped, duplicateValues, duplicateDetails }) {
+  if (skipped === 0) {
+    el.appendixExcelStatus.textContent = `تمت إضافة ${added} سجل كملحق بنجاح.`;
+    el.appendixDuplicatesList.classList.add('hidden');
+    el.appendixDuplicatesList.innerHTML = '';
+    el.appendixDuplicatesDownloadBtn.classList.add('hidden');
+    if (added > 0) {
+      window.showToast?.(`تمت إضافة ${added} مستفيد كملحق بنجاح`, 'success', 3000);
+      setTimeout(closeAppendixModal, 1200);
+    }
+    return;
+  }
+
+  // يوجد خطأ — لا نُغلق النافذة تلقائياً مهما كان، حتى يقدر المستخدم يقرأ
+  // التفاصيل بهدوء.
+  el.appendixExcelStatus.textContent =
+    `⚠ يوجد خطأ: تم رفض ${skipped} سجل${added > 0 ? `، وإضافة ${added} سجل بنجاح` : ''} — رقم الهوية مكرر (موجود مسبقاً بالجدول أو مكرر داخل الملف نفسه).`;
+
+  const items = duplicateDetails
+    .map(({ row, existing }) => {
+      const idValue = identifierColumnCache ? escapeHtml(String(row[identifierColumnCache] ?? '')) : '';
+      const existingLabel = existing
+        ? `— موجود مسبقاً${existing.__isAppendix ? ' (ملحق)' : ''}، ${existing.__status ? 'تم استلامه' : 'لم يُستلم بعد'}`
+        : '';
+      return `<li><b>${idValue}</b> ${existingLabel}</li>`;
+    })
+    .join('');
+  el.appendixDuplicatesList.innerHTML = `<strong>الهويات المرفوضة (${duplicateValues.length}):</strong><ul>${items}</ul>`;
+  el.appendixDuplicatesList.classList.remove('hidden');
+
+  el.appendixDuplicatesDownloadBtn.classList.remove('hidden');
+  el.appendixDuplicatesDownloadBtn.onclick = () => downloadAppendixDuplicatesFile(duplicateDetails);
+}
+
+/**
+ * يصدّر ملف Excel منفصل بكل الصفوف المرفوضة بسبب تكرار المعرّف — كل صف
+ * يحتوي بيانات الصف المرفوض كما ورد بالملف، بالإضافة لعمود "سبب الرفض"
+ * وأعمدة إضافية موسومة بـ"(سجل موجود مسبقاً)" تعرض بيانات السجل الأصلي
+ * صاحب نفس المعرّف — للمقارنة المباشرة بدون رجوع للجدول يدوياً.
+ */
+function downloadAppendixDuplicatesFile(duplicateDetails) {
+  const rows = duplicateDetails.map(({ row, existing }) => {
+    const out = {};
+    allColumns.forEach((col) => {
+      out[col] = row[col] ?? '';
+    });
+    out['سبب الرفض'] = 'رقم الهوية مكرر مع سجل موجود مسبقاً';
+    allColumns.forEach((col) => {
+      out[`(سجل موجود مسبقاً) ${col}`] = existing ? existing[col] ?? '' : '';
+    });
+    out['(سجل موجود مسبقاً) الحالة'] = existing ? (existing.__status ? 'تم الاستلام' : 'لم يتم الاستلام') : 'غير معروف';
+    return out;
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  worksheet['!views'] = [{ rightToLeft: true }];
+  const workbook = XLSX.utils.book_new();
+  workbook.Workbook = { views: [{ RTL: true }] };
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'هويات مكررة مرفوضة');
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(workbook, `أخطاء_ملحق_هويات_مكررة_${today}.xlsx`);
+}
+
 el.appendixFileInput?.addEventListener('change', async (event) => {
   const file = event.target.files[0];
   if (!file) return;
@@ -1846,18 +1929,8 @@ el.appendixFileInput?.addEventListener('change', async (event) => {
       return;
     }
 
-    const { added, skipped, duplicateValues } = await addAppendixRecords(rows);
-    let statusMessage = `تمت إضافة ${added} سجل كملحق.`;
-    if (skipped > 0) {
-      const sample = duplicateValues.slice(0, 5).join('، ');
-      statusMessage += ` ⚠ تم رفض ${skipped} سجل لوجود معرّف مكرر (موجود مسبقاً بالجدول أو مكرر داخل نفس الملف)`;
-      statusMessage += sample ? `: ${sample}${duplicateValues.length > 5 ? ' وغيرها...' : ''}.` : '.';
-    }
-    el.appendixExcelStatus.textContent = statusMessage;
-    if (added > 0) {
-      window.showToast?.(`تمت إضافة ${added} مستفيد كملحق بنجاح`, 'success', 3000);
-      setTimeout(closeAppendixModal, 1200);
-    }
+    const { added, skipped, duplicateValues, duplicateDetails } = await addAppendixRecords(rows);
+    renderAppendixDuplicatesResult({ added, skipped, duplicateValues, duplicateDetails });
   } catch (error) {
     console.error(error);
     el.appendixExcelStatus.textContent = 'تعذّرت قراءة الملف. تأكد أنه بصيغة Excel صحيحة (.xlsx أو .xls).';
