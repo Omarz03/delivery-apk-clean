@@ -414,6 +414,10 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 3px;
 }
+#appendixDuplicatesList ul {
+  max-height: 220px;
+  overflow-y: auto;
+}
 
 /* -------------------- إشعارات منبثقة (Toasts) -------------------- */
 .toast {
