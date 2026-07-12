@@ -241,6 +241,7 @@ const el = {
   appendixExcelView: document.getElementById('appendixExcelView'),
   appendixFormFields: document.getElementById('appendixFormFields'),
   appendixIndividualSubmit: document.getElementById('appendixIndividualSubmit'),
+  appendixIdWarning: document.getElementById('appendixIdWarning'),
   appendixFileInput: document.getElementById('appendixFileInput'),
   appendixTemplateBtn: document.getElementById('appendixTemplateBtn'),
   appendixExcelStatus: document.getElementById('appendixExcelStatus'),
@@ -336,6 +337,22 @@ function findDuplicateDeliveries(record) {
       normalizeIdValue(r[identifierColumnCache]) === key
   );
 }
+
+/**
+ * يبحث عن سجل موجود فعلاً (أصلي أو ملحق) بنفس قيمة عمود المعرّف الفريد —
+ * تُستخدم للتحقق الفوري وقت كتابة رقم الهوية بنموذج "إضافة ملحق فردي"، قبل
+ * حتى الضغط على زر الإضافة، تمييزاً عن findDuplicateDeliveries التي تتحقق
+ * فقط من السجلات المُسلَّمة فعلاً لسجل موجود مسبقاً بالجدول.
+ * @param {string} rawValue القيمة كما كُتبت بالحقل
+ * @returns {Object|null}
+ */
+function findRecordByIdentifierValue(rawValue) {
+  if (!identifierColumnCache) return null;
+  const key = normalizeIdValue(rawValue);
+  if (!key) return null;
+  return allRecords.find((r) => normalizeIdValue(r[identifierColumnCache]) === key) || null;
+}
+
 
 /**
  * يبحث ضمن دفعة صفوف (وقت الاستيراد، قبل أي حفظ) عن قيم معرّف مكررة —
@@ -788,7 +805,7 @@ function getNextAppendixNumber(numberColumn) {
 }
 
 async function addAppendixRecords(rawRows) {
-  if (!rawRows.length) return { added: 0, skipped: 0 };
+  if (!rawRows.length) return { added: 0, skipped: 0, duplicateValues: [] };
 
   const identifierColumn = (await getMeta('identifierColumn')) || null;
   // العمود الأول غالباً ما يكون عمود الترقيم التسلسلي بالملف الأصلي — نولّده
@@ -799,6 +816,7 @@ async function addAppendixRecords(rawRows) {
   const existingSyncIds = new Set(allRecords.map((r) => r.__syncId));
   const now = Date.now();
   let skipped = 0;
+  const duplicateValues = []; // قيم المعرّف الفعلية المرفوضة — لعرضها للمستخدم بدل رقم مجرّد
 
   const newRecords = [];
   for (const row of rawRows) {
@@ -816,6 +834,9 @@ async function addAppendixRecords(rawRows) {
     const syncId = buildAppendixSyncId(normalizedRow, allColumns, identifierColumn, existingSyncIds);
     if (existingSyncIds.has(syncId)) {
       skipped += 1; // نفس الشخص مضاف مسبقاً (نفس عمود المعرّف) — نتجاهله بدل تكراره
+      if (identifierColumn && normalizedRow[identifierColumn]) {
+        duplicateValues.push(String(normalizedRow[identifierColumn]).trim());
+      }
       if (numberColumn) nextNumber -= 1; // نتراجع عن الرقم حتى لا تظهر فجوة بالترقيم
       continue;
     }
@@ -847,7 +868,7 @@ async function addAppendixRecords(rawRows) {
     newRecords.forEach((r) => broadcastRecordUpdate(r));
   }
 
-  return { added: newRecords.length, skipped };
+  return { added: newRecords.length, skipped, duplicateValues };
 }
 
 async function finalizeImport(rows, columns, identifierColumn, fileName) {
@@ -1664,6 +1685,11 @@ function openAppendixModal() {
   setAppendixMode('individual');
   renderAppendixForm();
   el.appendixExcelStatus.textContent = '';
+  // تصفير حالة تحذير التكرار من فتحة سابقة — الحقول تُبنى من جديد، لكن زر
+  // "إضافة" وصندوق التحذير عنصران ثابتان بالـ HTML فلا يُعاد إنشاؤهما.
+  el.appendixIdWarning?.classList.add('hidden');
+  if (el.appendixIdWarning) el.appendixIdWarning.innerHTML = '';
+  if (el.appendixIndividualSubmit) el.appendixIndividualSubmit.disabled = false;
   el.appendixModal.classList.remove('hidden');
   el.appendixModal.classList.add('flex');
   el.appendixModalOverlay.classList.add('open');
@@ -1708,6 +1734,33 @@ function renderAppendixForm() {
       </label>`
       )
       .join('');
+
+  // تحقق فوري من تكرار رقم الهوية أثناء الكتابة — قبل حتى الضغط على "إضافة
+  // للجدول"، تماشياً مع نفس مبدأ حماية التسليم المزدوج لكن بمرحلة أبكر
+  // (منع الإدخال المكرر أصلاً بدل تحذير بعد وقوعه).
+  if (identifierColumnCache) {
+    const idInput = el.appendixFormFields.querySelector(
+      `.appendix-field-input[data-column="${CSS.escape(identifierColumnCache)}"]`
+    );
+    if (idInput) {
+      const checkForDuplicate = () => {
+        const existing = findRecordByIdentifierValue(idInput.value);
+        if (existing) {
+          const status = existing.__status ? 'وتم تسليمه بالفعل' : 'ولم يُسلَّم بعد';
+          const tag = existing.__isAppendix ? ' (كملحق)' : '';
+          el.appendixIdWarning.innerHTML = `<strong>⚠ هذا المعرّف موجود مسبقاً بالجدول${tag}</strong>${escapeHtml(status)} — لا يمكن إضافته مرة أخرى.`;
+          el.appendixIdWarning.classList.remove('hidden');
+          el.appendixIndividualSubmit.disabled = true;
+        } else {
+          el.appendixIdWarning.classList.add('hidden');
+          el.appendixIdWarning.innerHTML = '';
+          el.appendixIndividualSubmit.disabled = false;
+        }
+      };
+      idInput.addEventListener('input', checkForDuplicate);
+      idInput.addEventListener('blur', checkForDuplicate);
+    }
+  }
 }
 
 /**
@@ -1792,10 +1845,14 @@ el.appendixFileInput?.addEventListener('change', async (event) => {
       return;
     }
 
-    const { added, skipped } = await addAppendixRecords(rows);
-    el.appendixExcelStatus.textContent = `تمت إضافة ${added} سجل كملحق${
-      skipped > 0 ? `، وتجاهُل ${skipped} سجل مكرر (نفس المعرّف الفريد)` : ''
-    }.`;
+    const { added, skipped, duplicateValues } = await addAppendixRecords(rows);
+    let statusMessage = `تمت إضافة ${added} سجل كملحق.`;
+    if (skipped > 0) {
+      const sample = duplicateValues.slice(0, 5).join('، ');
+      statusMessage += ` ⚠ تم رفض ${skipped} سجل لوجود معرّف مكرر (موجود مسبقاً بالجدول أو مكرر داخل نفس الملف)`;
+      statusMessage += sample ? `: ${sample}${duplicateValues.length > 5 ? ' وغيرها...' : ''}.` : '.';
+    }
+    el.appendixExcelStatus.textContent = statusMessage;
     if (added > 0) {
       window.showToast?.(`تمت إضافة ${added} مستفيد كملحق بنجاح`, 'success', 3000);
       setTimeout(closeAppendixModal, 1200);
