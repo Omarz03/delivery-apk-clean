@@ -160,7 +160,9 @@
         <div id="appendixFormFields" class="flex flex-col gap-3 mb-4">
           <!-- تُبنى حقول ديناميكياً حسب أعمدة الجلسة الحالية في script.js -->
         </div>
-        <button id="appendixIndividualSubmit" class="w-full bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm py-2.5 rounded-xl">
+        <!-- تحذير فوري لو رقم الهوية المُدخَل موجود مسبقاً بالجدول (أصلي أو ملحق) -->
+        <p id="appendixIdWarning" class="hidden duplicate-warning" style="margin-bottom:12px;"></p>
+        <button id="appendixIndividualSubmit" class="w-full bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">
           إضافة للجدول
         </button>
       </div>
