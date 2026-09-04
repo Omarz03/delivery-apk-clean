@@ -7,6 +7,7 @@ node_modules/
 *.apk
 *.aab
 *.ipa
+*.zip
 
 # OS
 .DS_Store
