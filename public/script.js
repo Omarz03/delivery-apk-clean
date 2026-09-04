@@ -169,8 +169,8 @@ function clearAllData() {
 }
 
 /* -------------------------------------------------------------------------
-      2) عناصر الواجهة (DOM References)
-      ------------------------------------------------------------------------- */
+         2) عناصر الواجهة (DOM References)
+         ------------------------------------------------------------------------- */
 const el = {
   fileInput: document.getElementById("fileInput"),
   resetBtn: document.getElementById("resetBtn"),
@@ -265,8 +265,8 @@ const el = {
 };
 
 /* -------------------------------------------------------------------------
-      3) أدوات مساعدة
-      ------------------------------------------------------------------------- */
+         3) أدوات مساعدة
+         ------------------------------------------------------------------------- */
 
 /**
  * تطبيع نص عربي لأغراض البحث فقط (لا يُستخدم للتخزين أو العرض):
@@ -316,14 +316,14 @@ function hashRowContent(row, columns) {
 }
 
 /* -------------------------------------------------------------------------
-      كشف "التسليم المزدوج" — حماية نزاهة التوزيع
-      -------------------------------------------------------------------------
-      يعتمد على قيمة عمود المعرّف الفريد (رقم الهوية) نفسها، وليس __syncId،
-      لأن سجلّين قد يحملان نفس رقم الهوية لكن معرّفي مزامنة مختلفين — أشهر
-      حالة: نفس الهوية تكررت داخل ملف الإكسل الأصلي، فالصف الثاني يأخذ
-      __syncId احتياطياً (content hash) بدل الاصطدام بالأول (راجع finalizeImport)،
-      فيصيران سجلّين منفصلين قابلين للتسليم كلٌّ على حدة دون هذا الفحص.
-      ------------------------------------------------------------------------- */
+         كشف "التسليم المزدوج" — حماية نزاهة التوزيع
+         -------------------------------------------------------------------------
+         يعتمد على قيمة عمود المعرّف الفريد (رقم الهوية) نفسها، وليس __syncId،
+         لأن سجلّين قد يحملان نفس رقم الهوية لكن معرّفي مزامنة مختلفين — أشهر
+         حالة: نفس الهوية تكررت داخل ملف الإكسل الأصلي، فالصف الثاني يأخذ
+         __syncId احتياطياً (content hash) بدل الاصطدام بالأول (راجع finalizeImport)،
+         فيصيران سجلّين منفصلين قابلين للتسليم كلٌّ على حدة دون هذا الفحص.
+         ------------------------------------------------------------------------- */
 
 /**
  * يبحث عن سجلات أخرى (غير السجل الممرَّر) تحمل نفس قيمة عمود المعرّف
@@ -506,36 +506,36 @@ async function ensureDeviceIdentity() {
 }
 
 /* -------------------------------------------------------------------------
-      لوحة "الأجهزة المتصلة" — تعرض جهازك دائماً ("أنت")، بالإضافة للجهاز الآخر
-      إن كان متصلاً حالياً. سابقاً كانت اللوحة تعرض فقط الجهاز الآخر (أو رسالة
-      فراغ)، فكان جهازك نفسه لا يظهر إطلاقاً حتى أثناء الاتصال الفعلي.
-      ------------------------------------------------------------------------- */
+         لوحة "الأجهزة المتصلة" — تعرض جهازك دائماً ("أنت")، بالإضافة للجهاز الآخر
+         إن كان متصلاً حالياً. سابقاً كانت اللوحة تعرض فقط الجهاز الآخر (أو رسالة
+         فراغ)، فكان جهازك نفسه لا يظهر إطلاقاً حتى أثناء الاتصال الفعلي.
+         ------------------------------------------------------------------------- */
 function renderDevicesList(peer) {
   if (!el.devicesList || !el.devicesEmptyMsg) return;
 
   el.devicesEmptyMsg.classList.add("hidden"); // جهازك نفسه موجود بالقائمة دائماً
 
   const selfItem = `
-       <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pine/10 border border-line">
-         <span class="w-2 h-2 rounded-full bg-clay shrink-0"></span>
-         <span class="font-medium text-sm flex-1 overflow-hidden whitespace-nowrap">${escapeHtml(
-           deviceName || "هذا الجهاز"
-         )} <span class="text-ink/40">(أنت)</span></span>
-         <button onclick="window.renameThisDevice?.()" class="text-ink/40 hover:text-ink p-1 rounded-lg shrink-0" aria-label="تعديل اسمك" title="تعديل اسمك الظاهر لبقية الأجهزة">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-         </button>
-       </li>
-     `;
+          <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pine/10 border border-line">
+            <span class="w-2 h-2 rounded-full bg-clay shrink-0"></span>
+            <span class="font-medium text-sm flex-1 overflow-hidden whitespace-nowrap">${escapeHtml(
+              deviceName || "هذا الجهاز"
+            )} <span class="text-ink/40">(أنت)</span></span>
+            <button onclick="window.renameThisDevice?.()" class="text-ink/40 hover:text-ink p-1 rounded-lg shrink-0" aria-label="تعديل اسمك" title="تعديل اسمك الظاهر لبقية الأجهزة">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+          </li>
+        `;
 
   const peerItem = peer
     ? `
-       <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/70">
-         <span class="w-2 h-2 rounded-full bg-delivered shrink-0"></span>
-         <span class="font-medium text-sm overflow-hidden whitespace-nowrap">${escapeHtml(
-           peer.deviceName || "جهاز غير معروف"
-         )}</span>
-       </li>
-     `
+          <li class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pineLight/70">
+            <span class="w-2 h-2 rounded-full bg-delivered shrink-0"></span>
+            <span class="font-medium text-sm overflow-hidden whitespace-nowrap">${escapeHtml(
+              peer.deviceName || "جهاز غير معروف"
+            )}</span>
+          </li>
+        `
     : "";
 
   el.devicesList.innerHTML = selfItem + peerItem;
@@ -617,14 +617,14 @@ function setSyncMessage(message, tone = "neutral") {
 }
 
 /* -------------------------------------------------------------------------
-      4) لوحة الجلسة (استيراد + مزامنة) — تُفتح وتُغلق من زر "الجلسة" بالأعلى
-      -------------------------------------------------------------------------
-      بدل أن يبقى قسما الاستيراد والمزامنة ظاهرين طوال الوقت فوق الجدول، جُمعا
-      في لوحة جانبية واحدة تُفتح عند الحاجة فقط (بدء جلسة جديدة، أو التحقق من
-      حالة الاتصال)، لتبقى الشاشة الرئيسية مخصصة للجدول والعمل الفعلي.
-      وبنفس الفكرة: لوحة "الأجهزة المتصلة" تُفتح من زر منفصل بجانبه. اللوحتان
-      تتشاركان نفس جهة الانزلاق، لذا نضمن أن فتح إحداهما يُغلق الأخرى تلقائياً.
-      ------------------------------------------------------------------------- */
+         4) لوحة الجلسة (استيراد + مزامنة) — تُفتح وتُغلق من زر "الجلسة" بالأعلى
+         -------------------------------------------------------------------------
+         بدل أن يبقى قسما الاستيراد والمزامنة ظاهرين طوال الوقت فوق الجدول، جُمعا
+         في لوحة جانبية واحدة تُفتح عند الحاجة فقط (بدء جلسة جديدة، أو التحقق من
+         حالة الاتصال)، لتبقى الشاشة الرئيسية مخصصة للجدول والعمل الفعلي.
+         وبنفس الفكرة: لوحة "الأجهزة المتصلة" تُفتح من زر منفصل بجانبه. اللوحتان
+         تتشاركان نفس جهة الانزلاق، لذا نضمن أن فتح إحداهما يُغلق الأخرى تلقائياً.
+         ------------------------------------------------------------------------- */
 function openSessionPanel() {
   closeDevicesPanel();
   el.sessionPanel.classList.add("open");
@@ -634,11 +634,11 @@ function openSessionPanel() {
 window.openSessionPanel = openSessionPanel; // يُستخدم من زر "إعادة الاتصال" بـ index.html
 
 /* -------------------------------------------------------------------------
-      شريط "كان عندك جلسة سابقة" — يظهر عند فتح التطبيق إن وُجدت جلسة P2P
-      محفوظة (state: lastSessionRole)، حتى لو كان الإغلاق بالكامل (مو بس
-      تصغير). الضغط عليه يستأنف نفس تدفق QR بضغطة واحدة (دور محفوظ)، بدل ما
-      يضطر المستخدم يفتح اللوحة ويختار "مضيف"/"تابع" يدوياً من جديد.
-      ------------------------------------------------------------------------- */
+         شريط "كان عندك جلسة سابقة" — يظهر عند فتح التطبيق إن وُجدت جلسة P2P
+         محفوظة (state: lastSessionRole)، حتى لو كان الإغلاق بالكامل (مو بس
+         تصغير). الضغط عليه يستأنف نفس تدفق QR بضغطة واحدة (دور محفوظ)، بدل ما
+         يضطر المستخدم يفتح اللوحة ويختار "مضيف"/"تابع" يدوياً من جديد.
+         ------------------------------------------------------------------------- */
 function showResumeSessionBanner(role) {
   if (window.deliveryP2P?.connected) return; // متصل فعلاً، لا داعي للتذكير
 
@@ -647,14 +647,14 @@ function showResumeSessionBanner(role) {
   banner.className =
     "fixed inset-x-0 top-0 z-[70] bg-clay text-white px-4 py-3 flex items-center justify-between gap-3 shadow-sm";
   banner.innerHTML = `
-       <span class="text-sm font-medium">كان عندك جلسة تسليم سابقة (${
-         role === "host" ? "كمضيف" : "كتابع"
-       }) — هل تريد استئنافها؟</span>
-       <div class="flex items-center gap-2 shrink-0">
-         <button id="resumeSessionBtn" class="bg-white text-clay hover:bg-paper transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">استئناف</button>
-         <button id="dismissResumeBtn" class="text-white px-2 py-1.5 text-sm" aria-label="تجاهل">✕</button>
-       </div>
-     `;
+          <span class="text-sm font-medium">كان عندك جلسة تسليم سابقة (${
+            role === "host" ? "كمضيف" : "كتابع"
+          }) — هل تريد استئنافها؟</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <button id="resumeSessionBtn" class="bg-white text-clay hover:bg-paper transition-colors px-3 py-1.5 rounded-lg text-sm font-semibold">استئناف</button>
+            <button id="dismissResumeBtn" class="text-white px-2 py-1.5 text-sm" aria-label="تجاهل">✕</button>
+          </div>
+        `;
   document.body.prepend(banner);
 
   document.getElementById("resumeSessionBtn").addEventListener("click", () => {
@@ -733,8 +733,8 @@ document.addEventListener("keydown", (event) => {
 });
 
 /* -------------------------------------------------------------------------
-      5) استيراد ملف Excel
-      ------------------------------------------------------------------------- */
+         5) استيراد ملف Excel
+         ------------------------------------------------------------------------- */
 let pendingImport = null; // { rows, columns, fileName } بانتظار اختيار عمود المعرّف
 
 el.fileInput.addEventListener("change", async (event) => {
@@ -796,13 +796,13 @@ el.fileInput.addEventListener("change", async (event) => {
  * تتكرر بيانات المستفيدين عند المزامنة أو إعادة الاستيراد.
  */
 /* -------------------------------------------------------------------------
-      إضافة مستفيدين كـ"ملحق" بعد بدء الجلسة (بدون استبدال البيانات الحالية)
-      -------------------------------------------------------------------------
-      يفيد ميدانياً لما يظهر مستفيدون إضافيون بعد بدء التسليم (لم يكونوا
-      بالملف الأصلي). الإضافة تصير آخر الجدول، مع علامة داخلية (__isAppendix)
-      وملاحظة تلقائية "ملحق" لتمييزها، وتُبَث فوراً لبقية الأجهزة عبر نفس
-      آلية بث التحديثات العادية (record_updated) — أي جهاز متصل يقدر يضيف.
-      ------------------------------------------------------------------------- */
+         إضافة مستفيدين كـ"ملحق" بعد بدء الجلسة (بدون استبدال البيانات الحالية)
+         -------------------------------------------------------------------------
+         يفيد ميدانياً لما يظهر مستفيدون إضافيون بعد بدء التسليم (لم يكونوا
+         بالملف الأصلي). الإضافة تصير آخر الجدول، مع علامة داخلية (__isAppendix)
+         وملاحظة تلقائية "ملحق" لتمييزها، وتُبَث فوراً لبقية الأجهزة عبر نفس
+         آلية بث التحديثات العادية (record_updated) — أي جهاز متصل يقدر يضيف.
+         ------------------------------------------------------------------------- */
 
 /**
  * تبني معرّف مزامنة (__syncId) لسجل ملحق جديد بنفس منطق الاستيراد الأساسي
@@ -997,18 +997,20 @@ async function finalizeImport(rows, columns, identifierColumn, fileName) {
 }
 
 /* -------------------------------------------------------------------------
-      نافذة اختيار عمود المعرّف الفريد (تظهر فقط عند تعذّر الاكتشاف التلقائي)
-      ------------------------------------------------------------------------- */
+         نافذة اختيار عمود المعرّف الفريد (تظهر فقط عند تعذّر الاكتشاف التلقائي)
+         ------------------------------------------------------------------------- */
 function openIdentifierModal(columns) {
   el.identifierColumnsList.innerHTML = columns
     .map(
       (col, i) => `
-         <label class="flex items-center gap-2.5 border border-line rounded-xl px-3.5 py-2.5 cursor-pointer hover:bg-paper transition-colors">
-           <input type="radio" name="identifierColumn" value="${escapeHtml(
-             col
-           )}" ${i === 0 ? "checked" : ""} class="accent-clay" />
-           <span class="text-sm font-medium text-ink">${escapeHtml(col)}</span>
-         </label>`
+            <label class="flex items-center gap-2.5 border border-line rounded-xl px-3.5 py-2.5 cursor-pointer hover:bg-paper transition-colors">
+              <input type="radio" name="identifierColumn" value="${escapeHtml(
+                col
+              )}" ${i === 0 ? "checked" : ""} class="accent-clay" />
+              <span class="text-sm font-medium text-ink">${escapeHtml(
+                col
+              )}</span>
+            </label>`
     )
     .join("");
 
@@ -1049,8 +1051,8 @@ el.identifierSkipBtn.addEventListener("click", async () => {
 el.identifierModalOverlay.addEventListener("click", closeIdentifierModal);
 
 /* -------------------------------------------------------------------------
-      6) "بدء من جديد" — مسح كل البيانات
-      ------------------------------------------------------------------------- */
+         6) "بدء من جديد" — مسح كل البيانات
+         ------------------------------------------------------------------------- */
 el.resetBtn.addEventListener("click", async () => {
   const isP2PConnected = window.deliveryP2P?.connected;
   const willAlsoResetOthers = isP2PConnected;
@@ -1076,8 +1078,8 @@ el.resetBtn.addEventListener("click", async () => {
 });
 
 /* -------------------------------------------------------------------------
-      7) عرض الجدول والبحث
-      ------------------------------------------------------------------------- */
+         7) عرض الجدول والبحث
+         ------------------------------------------------------------------------- */
 
 function renderApp() {
   const hasData = allRecords.length > 0;
@@ -1160,8 +1162,8 @@ function renderTableRows() {
         ? `<span class="lock-icon-cell" data-tip="قيد التعديل: ${escapeHtml(
             lock.deviceName
           )}" aria-label="قيد التعديل">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-              </span>`
+                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                 </span>`
         : record.__status
         ? `<span class="status-badge status-badge--delivered" data-tip="تم الاستلام" aria-label="تم الاستلام"></span>`
         : `<span class="status-badge status-badge--pending" data-tip="لم يتم الاستلام" aria-label="لم يتم الاستلام"></span>`;
@@ -1208,10 +1210,10 @@ el.tableBody.addEventListener("click", (event) => {
 });
 
 /* -------------------------------------------------------------------------
-      بحث رقم الصف + زر المسح
-      رقم الصف هو الترتيب الظاهر بالجدول (١-based)، بغض النظر عن البحث العام.
-      يفيد ميدانياً: "اذهب للصف ١٣٢" أسرع من البحث باسم طويل.
-      ------------------------------------------------------------------------- */
+         بحث رقم الصف + زر المسح
+         رقم الصف هو الترتيب الظاهر بالجدول (١-based)، بغض النظر عن البحث العام.
+         يفيد ميدانياً: "اذهب للصف ١٣٢" أسرع من البحث باسم طويل.
+         ------------------------------------------------------------------------- */
 const elRowSearch = {
   toggle: document.getElementById("rowSearchToggle"),
   wrapper: document.getElementById("rowSearchWrapper"),
@@ -1263,8 +1265,8 @@ el.searchInput.addEventListener("input", (event) => {
 });
 
 /* -------------------------------------------------------------------------
-      تصفية حسب حالة الاستلام (الكل / تم الاستلام / لم يتم الاستلام)
-      ------------------------------------------------------------------------- */
+         تصفية حسب حالة الاستلام (الكل / تم الاستلام / لم يتم الاستلام)
+         ------------------------------------------------------------------------- */
 const statusFilterMap = {
   all: null,
   delivered: true,
@@ -1325,8 +1327,8 @@ document.querySelectorAll(".status-filter-btn").forEach((btn) => {
 });
 
 /* -------------------------------------------------------------------------
-      8) النافذة الجانبية (Drawer): عرض التفاصيل وتعديل الحالة
-      ------------------------------------------------------------------------- */
+         8) النافذة الجانبية (Drawer): عرض التفاصيل وتعديل الحالة
+         ------------------------------------------------------------------------- */
 
 /**
  * يعرض جملة "تم التسليم في [الوقت] من خلال المستخدم [الاسم]" أسفل مفتاح
@@ -1400,10 +1402,10 @@ function renderDuplicateWarning(matches) {
       : "";
 
   el.duplicateWarning.innerHTML = `
-       <strong>⚠ احتمال تسليم مزدوج لنفس الشخص</strong>
-       نفس رقم الهوية مُسجَّل "تم الاستلام" مسبقاً بسجل آخر بهذا الجدول:
-       <ul>${items}${more}</ul>
-     `;
+          <strong>⚠ احتمال تسليم مزدوج لنفس الشخص</strong>
+          نفس رقم الهوية مُسجَّل "تم الاستلام" مسبقاً بسجل آخر بهذا الجدول:
+          <ul>${items}${more}</ul>
+        `;
   el.duplicateWarning.classList.remove("hidden");
 }
 
@@ -1417,14 +1419,14 @@ function openDrawer(id) {
     .map((col) => {
       const isEdited = (record.__editedFields || []).includes(col);
       return `
-         <div class="drawer-field${isEdited ? " drawer-field--edited" : ""}">
-           <span class="label">${escapeHtml(col)}${
+            <div class="drawer-field${isEdited ? " drawer-field--edited" : ""}">
+              <span class="label">${escapeHtml(col)}${
         isEdited ? ' <span class="edited-tag">(معدّل)</span>' : ""
       }</span>
-           <input type="text" class="value drawer-original-input" data-column="${escapeAttr(
-             col
-           )}" value="${escapeAttr(record[col] ?? "")}" />
-         </div>`;
+              <input type="text" class="value drawer-original-input" data-column="${escapeAttr(
+                col
+              )}" value="${escapeAttr(record[col] ?? "")}" />
+            </div>`;
     })
     .join("");
 
@@ -1583,8 +1585,8 @@ el.drawerSave.addEventListener("click", async () => {
 });
 
 /* -------------------------------------------------------------------------
-      9) تصدير البيانات كملف Excel محدث
-      ------------------------------------------------------------------------- */
+         9) تصدير البيانات كملف Excel محدث
+         ------------------------------------------------------------------------- */
 el.exportBtn.addEventListener("click", () => {
   if (allRecords.length === 0) return;
 
@@ -1618,13 +1620,13 @@ el.exportBtn.addEventListener("click", () => {
 });
 
 /* -------------------------------------------------------------------------
-      9.1) تقرير ختام الجلسة/اليوم
-      -------------------------------------------------------------------------
-      ملخّص سريع (وقابل للتصدير كملف إكسل منفصل وخفيف) لحالة التسليم الحالية:
-      إجمالي/تم/متبقي/نسبة، عدد سجلات الملحق وكم منها سُلِّم، وتفصيل حسب عمود
-      "منطقة/مخيم/قطاع" إن اكتُشف تلقائياً بين أعمدة الملف المستورد. يفيد عند
-      تسليم التقرير اليومي للمكتب دون تصدير واستعراض الجدول الكامل يدوياً.
-      ------------------------------------------------------------------------- */
+         9.1) تقرير ختام الجلسة/اليوم
+         -------------------------------------------------------------------------
+         ملخّص سريع (وقابل للتصدير كملف إكسل منفصل وخفيف) لحالة التسليم الحالية:
+         إجمالي/تم/متبقي/نسبة، عدد سجلات الملحق وكم منها سُلِّم، وتفصيل حسب عمود
+         "منطقة/مخيم/قطاع" إن اكتُشف تلقائياً بين أعمدة الملف المستورد. يفيد عند
+         تسليم التقرير اليومي للمكتب دون تصدير واستعراض الجدول الكامل يدوياً.
+         ------------------------------------------------------------------------- */
 
 /**
  * يحاول اكتشاف عمود "تصنيف جغرافي" (منطقة/مخيم/قطاع...) من بين أعمدة
@@ -1719,32 +1721,34 @@ function renderSessionReport() {
   el.reportStatsGrid.innerHTML = cards
     .map(
       (c) => `
-       <div class="report-stat-card ${c.cls}">
-         <span class="report-stat-value">${escapeHtml(String(c.value))}</span>
-         <span class="report-stat-label">${escapeHtml(c.label)}</span>
-       </div>`
+          <div class="report-stat-card ${c.cls}">
+            <span class="report-stat-value">${escapeHtml(
+              String(c.value)
+            )}</span>
+            <span class="report-stat-label">${escapeHtml(c.label)}</span>
+          </div>`
     )
     .join("");
 
   if (r.breakdown && r.breakdown.groups.length > 0) {
     el.reportBreakdownColumnName.textContent = r.breakdown.column;
     el.reportBreakdownTable.innerHTML = `
-         <thead>
-           <tr><th>${escapeHtml(
-             r.breakdown.column
-           )}</th><th>تم</th><th>الإجمالي</th><th>النسبة</th></tr>
-         </thead>
-         <tbody>
-           ${r.breakdown.groups
-             .map(([key, g]) => {
-               const pct =
-                 g.total > 0 ? Math.round((g.delivered / g.total) * 100) : 0;
-               return `<tr><td>${escapeHtml(key)}</td><td>${
-                 g.delivered
-               }</td><td>${g.total}</td><td>${pct}%</td></tr>`;
-             })
-             .join("")}
-         </tbody>`;
+            <thead>
+              <tr><th>${escapeHtml(
+                r.breakdown.column
+              )}</th><th>تم</th><th>الإجمالي</th><th>النسبة</th></tr>
+            </thead>
+            <tbody>
+              ${r.breakdown.groups
+                .map(([key, g]) => {
+                  const pct =
+                    g.total > 0 ? Math.round((g.delivered / g.total) * 100) : 0;
+                  return `<tr><td>${escapeHtml(key)}</td><td>${
+                    g.delivered
+                  }</td><td>${g.total}</td><td>${pct}%</td></tr>`;
+                })
+                .join("")}
+            </tbody>`;
     el.reportBreakdownWrap.classList.remove("hidden");
   } else {
     el.reportBreakdownWrap.classList.add("hidden");
@@ -1825,8 +1829,8 @@ function appendSessionReportSheets(workbook) {
 }
 
 /* -------------------------------------------------------------------------
-      نافذة "إضافة ملحق" — التفاعل مع الواجهة
-      ------------------------------------------------------------------------- */
+         نافذة "إضافة ملحق" — التفاعل مع الواجهة
+         ------------------------------------------------------------------------- */
 function openAppendixModal() {
   if (allColumns.length === 0) return; // لا معنى للإضافة قبل بدء جلسة أصلاً
   setAppendixMode("individual");
@@ -1880,14 +1884,14 @@ function renderAppendixForm() {
     editableColumns
       .map(
         (col) => `
-         <label class="block">
-           <span class="block text-xs font-semibold text-ink/55 mb-1.5">${escapeHtml(
-             col
-           )}</span>
-           <input type="text" class="appendix-field-input w-full border border-line rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay" data-column="${escapeAttr(
-             col
-           )}" />
-         </label>`
+            <label class="block">
+              <span class="block text-xs font-semibold text-ink/55 mb-1.5">${escapeHtml(
+                col
+              )}</span>
+              <input type="text" class="appendix-field-input w-full border border-line rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay" data-column="${escapeAttr(
+                col
+              )}" />
+            </label>`
       )
       .join("");
 
@@ -2130,22 +2134,22 @@ el.appendixFileInput?.addEventListener("change", async (event) => {
 });
 
 /* -------------------------------------------------------------------------
-      10) المزامنة الآنية بين الأجهزة (Socket.io)
-      -------------------------------------------------------------------------
-      فكرة العمل:
-        - كل جهاز يبقى يعمل محلياً بالكامل عبر IndexedDB بغض النظر عن الاتصال.
-        - الخادم لا يخزّن شيئاً على القرص ولا يملك أي بيانات من تلقاء نفسه؛ هو
-          فقط "لوح مرجعي" في الذاكرة يعتمد على أن تزوّده الأجهزة ببياناتها.
-        - عند الاتصال (أو إعادة الاتصال): كل جهاز يرسل client-data (نسخته
-          المحلية) للخادم أولاً، ثم يطلب request-all-data ليستقبل send-all-data
-          التي قد تكون الآن مدموجة مع بيانات أجهزة أخرى أيضاً — وهذا بالتحديد
-          ما يحل مشكلة "الموبايل لا يرى بيانات اللابتوب": فور اتصال اللابتوب
-          يرسل بياناته للخادم، وفور اتصال الموبايل يطلبها فيحصل عليها فوراً.
-        - أي تعديل لاحق (تغيير حالة الاستلام مثلاً) يُبَث فوراً (record_updated)،
-          وأي استيراد كامل لملف جديد يُبَث بالكامل (dataset_replaced).
-        - المطابقة بين الأجهزة تتم عبر __syncId (وليس id المحلي)، والفصل بين
-          النسخ المتعارضة يتم عبر "الأحدث يفوز" باستخدام __updatedAt.
-      ------------------------------------------------------------------------- */
+         10) المزامنة الآنية بين الأجهزة (Socket.io)
+         -------------------------------------------------------------------------
+         فكرة العمل:
+           - كل جهاز يبقى يعمل محلياً بالكامل عبر IndexedDB بغض النظر عن الاتصال.
+           - الخادم لا يخزّن شيئاً على القرص ولا يملك أي بيانات من تلقاء نفسه؛ هو
+             فقط "لوح مرجعي" في الذاكرة يعتمد على أن تزوّده الأجهزة ببياناتها.
+           - عند الاتصال (أو إعادة الاتصال): كل جهاز يرسل client-data (نسخته
+             المحلية) للخادم أولاً، ثم يطلب request-all-data ليستقبل send-all-data
+             التي قد تكون الآن مدموجة مع بيانات أجهزة أخرى أيضاً — وهذا بالتحديد
+             ما يحل مشكلة "الموبايل لا يرى بيانات اللابتوب": فور اتصال اللابتوب
+             يرسل بياناته للخادم، وفور اتصال الموبايل يطلبها فيحصل عليها فوراً.
+           - أي تعديل لاحق (تغيير حالة الاستلام مثلاً) يُبَث فوراً (record_updated)،
+             وأي استيراد كامل لملف جديد يُبَث بالكامل (dataset_replaced).
+           - المطابقة بين الأجهزة تتم عبر __syncId (وليس id المحلي)، والفصل بين
+             النسخ المتعارضة يتم عبر "الأحدث يفوز" باستخدام __updatedAt.
+         ------------------------------------------------------------------------- */
 
 function setSyncConnected(isConnected) {
   if (el.syncDot)
@@ -2290,8 +2294,8 @@ async function applyIncomingFullDataset(
 }
 
 /* -------------------------------------------------------------------------
-      10b) تصدير الدوال لـ sync-bridge.js (WebRTC P2P)
-      ------------------------------------------------------------------------- */
+         10b) تصدير الدوال لـ sync-bridge.js (WebRTC P2P)
+         ------------------------------------------------------------------------- */
 window.upsertBySyncId = upsertBySyncId;
 window.replaceAllRecords = replaceAllRecords;
 window.getAllRecords = getAllRecords;
@@ -2358,8 +2362,8 @@ Object.defineProperty(window, "deviceName", {
 });
 
 /* -------------------------------------------------------------------------
-      11) مؤشر حالة الاتصال بالإنترنت (مفيد ميدانياً لمعرفة أن البيانات تُحفظ محلياً)
-      ------------------------------------------------------------------------- */
+         11) مؤشر حالة الاتصال بالإنترنت (مفيد ميدانياً لمعرفة أن البيانات تُحفظ محلياً)
+         ------------------------------------------------------------------------- */
 function updateConnectionStatus() {
   // مؤشر الاتصال — اختياري في النسخة P2P
   const dot = document.getElementById("connectionDot");
@@ -2375,8 +2379,8 @@ window.addEventListener("online", updateConnectionStatus);
 window.addEventListener("offline", updateConnectionStatus);
 
 /* -------------------------------------------------------------------------
-      12) تسجيل Service Worker (لتفعيل العمل كتطبيق PWA بدون اتصال)
-      ------------------------------------------------------------------------- */
+         12) تسجيل Service Worker (لتفعيل العمل كتطبيق PWA بدون اتصال)
+         ------------------------------------------------------------------------- */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("service-worker.js").catch((error) => {
@@ -2386,22 +2390,22 @@ if ("serviceWorker" in navigator) {
 }
 
 /* -------------------------------------------------------------------------
-      13) اعتراض زر الرجوع (أندرويد) — يتطلب ضغطتين متتاليتين للخروج
-      -------------------------------------------------------------------------
-      الخروج المفاجئ من التطبيق (بالخطأ عبر زر الرجوع) يقطع اتصال WebRTC فوراً
-      لأن الصفحة/JS كلها تُغلق. بعد ملاحظة أن هذا يصير كثيراً بالخطأ أثناء
-      الاستخدام الفعلي، اعتمدنا نمط "اضغط رجوع مرتين للخروج" المعتاد بمعظم
-      تطبيقات أندرويد: الضغطة الأولى فقط تُغلق أي قائمة/نافذة مفتوحة (كأنها
-      ضغط "إلغاء" أو ×)؛ إن لم يكن هناك شيء مفتوح، تُظهر تحذيراً وتنتظر ضغطة
-      ثانية خلال مهلة قصيرة (انظر EXIT_CONFIRM_WINDOW_MS) قبل الخروج فعلياً.
-      هذا السلوك ثابت سواء كانت هناك جلسة مزامنة P2P نشطة أم لا — لا يوجد أي
-      استثناء خاص بحالة الجلسة هنا عمداً، فالمستخدم يجب أن يقدر يخرج دائماً
-      بنفس الطريقة المتوقعة.
-      نغطي حالتين مختلفتين لأن التطبيق قد يعمل إما كـ APK حقيقي (Capacitor) أو
-      كـ PWA على المتصفح مباشرة (الحالة الحالية عبر GitHub Pages) — وزر الرجوع
-      بالأندرويد يُدار بطريقة مختلفة تماماً بكل حالة، لكن كلا الفرعين يستدعيان
-      نفس دالة القرار shouldExitNow() أدناه لضمان سلوك متطابق.
-      ------------------------------------------------------------------------- */
+         13) اعتراض زر الرجوع (أندرويد) — يتطلب ضغطتين متتاليتين للخروج
+         -------------------------------------------------------------------------
+         الخروج المفاجئ من التطبيق (بالخطأ عبر زر الرجوع) يقطع اتصال WebRTC فوراً
+         لأن الصفحة/JS كلها تُغلق. بعد ملاحظة أن هذا يصير كثيراً بالخطأ أثناء
+         الاستخدام الفعلي، اعتمدنا نمط "اضغط رجوع مرتين للخروج" المعتاد بمعظم
+         تطبيقات أندرويد: الضغطة الأولى فقط تُغلق أي قائمة/نافذة مفتوحة (كأنها
+         ضغط "إلغاء" أو ×)؛ إن لم يكن هناك شيء مفتوح، تُظهر تحذيراً وتنتظر ضغطة
+         ثانية خلال مهلة قصيرة (انظر EXIT_CONFIRM_WINDOW_MS) قبل الخروج فعلياً.
+         هذا السلوك ثابت سواء كانت هناك جلسة مزامنة P2P نشطة أم لا — لا يوجد أي
+         استثناء خاص بحالة الجلسة هنا عمداً، فالمستخدم يجب أن يقدر يخرج دائماً
+         بنفس الطريقة المتوقعة.
+         نغطي حالتين مختلفتين لأن التطبيق قد يعمل إما كـ APK حقيقي (Capacitor) أو
+         كـ PWA على المتصفح مباشرة (الحالة الحالية عبر GitHub Pages) — وزر الرجوع
+         بالأندرويد يُدار بطريقة مختلفة تماماً بكل حالة، لكن كلا الفرعين يستدعيان
+         نفس دالة القرار shouldExitNow() أدناه لضمان سلوك متطابق.
+         ------------------------------------------------------------------------- */
 function setupBackButtonGuard() {
   /**
    * تتحقق من أي قائمة جانبية/نافذة مفتوحة حالياً وتسكرها (بمثابة الضغط على
@@ -2450,7 +2454,7 @@ function setupBackButtonGuard() {
   // 100% — هذا قرار أمان متعمّد بتصميم المتصفحات نفسها (لمنع مواقع خبيثة من
   // "حبس" المستخدم داخل الصفحة)، وليس قصوراً بالتنفيذ. أقصى ما يمكن ضمانه
   // فعلياً هو نمط "اضغط رجوع مرتين للخروج" المعتاد بمعظم تطبيقات أندرويد.
-  const EXIT_CONFIRM_WINDOW_MS = 2500;
+  const EXIT_CONFIRM_WINDOW_MS = 1000;
   let awaitingExitConfirm = false;
   let exitConfirmTimer = null;
 
@@ -2549,8 +2553,8 @@ function setupBackButtonGuard() {
 }
 
 /* -------------------------------------------------------------------------
-      14) نقطة البداية: فتح القاعدة، تحميل البيانات المحفوظة سابقاً، وعرضها
-      ------------------------------------------------------------------------- */
+         14) نقطة البداية: فتح القاعدة، تحميل البيانات المحفوظة سابقاً، وعرضها
+         ------------------------------------------------------------------------- */
 (async function init() {
   updateConnectionStatus();
 
