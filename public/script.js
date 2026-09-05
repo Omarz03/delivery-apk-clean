@@ -1791,6 +1791,18 @@ el.reportModal?.addEventListener("click", (event) => {
  * واحد جاهز.
  * @param {XLSX.WorkBook} workbook
  */
+/**
+ * ينظّف اسم الشيت من الرموز الممنوعة في إكسل ( : \ / ? * [ ] )
+ * ويقصّه لحد 31 حرفاً — لتفادي انهيار التصدير عندما يحتوي اسم العمود
+ * (مثل "المنطقة/الحي") على أحد هذه الرموز.
+ */
+function sanitizeSheetName(name) {
+  const cleaned = String(name)
+    .replace(/[:\\/?*[\]]/g, "")
+    .trim();
+  return (cleaned || "ورقة").slice(0, 31);
+}
+
 function appendSessionReportSheets(workbook) {
   const r = computeSessionReport();
 
@@ -1827,7 +1839,7 @@ function appendSessionReportSheets(workbook) {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(breakdownRows),
-      `حسب ${r.breakdown.column}`.slice(0, 31)
+      sanitizeSheetName(`حسب ${r.breakdown.column}`)
     );
   }
 }
