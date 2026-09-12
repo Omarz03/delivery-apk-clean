@@ -251,17 +251,23 @@ const el = {
   appendixIndividualSubmit: document.getElementById("appendixIndividualSubmit"),
   appendixIdWarning: document.getElementById("appendixIdWarning"),
   appendixFileInput: document.getElementById("appendixFileInput"),
-  appendixExcelDeliveredToggle: document.getElementById(
-    "appendixExcelDeliveredToggle"
-  ),
-  appendixExcelDeliveredLabel: document.getElementById(
-    "appendixExcelDeliveredLabel"
-  ),
   appendixIndividualDeliveredToggle: document.getElementById(
     "appendixIndividualDeliveredToggle"
   ),
   appendixIndividualDeliveredLabel: document.getElementById(
     "appendixIndividualDeliveredLabel"
+  ),
+  appendixDeliveryConfirmOverlay: document.getElementById(
+    "appendixDeliveryConfirmOverlay"
+  ),
+  appendixDeliveryConfirmModal: document.getElementById(
+    "appendixDeliveryConfirmModal"
+  ),
+  appendixDeliveryConfirmYes: document.getElementById(
+    "appendixDeliveryConfirmYes"
+  ),
+  appendixDeliveryConfirmNo: document.getElementById(
+    "appendixDeliveryConfirmNo"
   ),
   appendixTemplateBtn: document.getElementById("appendixTemplateBtn"),
   appendixExcelStatus: document.getElementById("appendixExcelStatus"),
@@ -1588,19 +1594,47 @@ function isDeliveredToggleChecked(toggleEl) {
   return toggleEl?.dataset.checked === "true";
 }
 
+/**
+ * تنبيه إلزامي يظهر فور اختيار ملف Excel باستيراد "ملحق جماعي" — يحدّد حالة
+ * استلام كل صفوف الدفعة بالكامل (بلا مفتاح تبديل منفصل بهذا الوضع، فالتنبيه
+ * هو المصدر الوحيد للقرار هنا). طبقته أعلى من نافذة "إضافة ملحق" (z-[70]
+ * مقابل z-[65]) فتبقى ظاهرة حتى لو أُغلقت النافذة تلقائياً بعد نجاح الإضافة.
+ * لا يوجد خيار "إلغاء" أو إغلاق بالنقر على الخلفية عمداً — الهدف إجبار قرار
+ * واعٍ صريح في كل مرة. تُعيد Promise<boolean>: true = "نعم، تم الاستلام"،
+ * false = "لا، لم يستلم بعد".
+ */
+function confirmAppendixDelivery() {
+  return new Promise((resolve) => {
+    if (!el.appendixDeliveryConfirmModal) {
+      resolve(false);
+      return;
+    }
+
+    el.appendixDeliveryConfirmModal.classList.remove("hidden");
+    el.appendixDeliveryConfirmModal.classList.add("flex");
+    el.appendixDeliveryConfirmOverlay?.classList.add("open");
+
+    const cleanup = (result) => {
+      el.appendixDeliveryConfirmModal.classList.add("hidden");
+      el.appendixDeliveryConfirmModal.classList.remove("flex");
+      el.appendixDeliveryConfirmOverlay?.classList.remove("open");
+      el.appendixDeliveryConfirmYes?.removeEventListener("click", onYes);
+      el.appendixDeliveryConfirmNo?.removeEventListener("click", onNo);
+      resolve(result);
+    };
+    const onYes = () => cleanup(true);
+    const onNo = () => cleanup(false);
+
+    el.appendixDeliveryConfirmYes?.addEventListener("click", onYes);
+    el.appendixDeliveryConfirmNo?.addEventListener("click", onNo);
+  });
+}
+
 el.appendixIndividualDeliveredToggle?.addEventListener("click", () => {
   setDeliveredToggle(
     el.appendixIndividualDeliveredToggle,
     el.appendixIndividualDeliveredLabel,
     !isDeliveredToggleChecked(el.appendixIndividualDeliveredToggle)
-  );
-});
-
-el.appendixExcelDeliveredToggle?.addEventListener("click", () => {
-  setDeliveredToggle(
-    el.appendixExcelDeliveredToggle,
-    el.appendixExcelDeliveredLabel,
-    !isDeliveredToggleChecked(el.appendixExcelDeliveredToggle)
   );
 });
 
@@ -2005,11 +2039,6 @@ function openAppendixModal() {
     el.appendixIndividualDeliveredLabel,
     false
   );
-  setDeliveredToggle(
-    el.appendixExcelDeliveredToggle,
-    el.appendixExcelDeliveredLabel,
-    false
-  );
   el.appendixModal.classList.remove("hidden");
   el.appendixModal.classList.add("flex");
   el.appendixModalOverlay.classList.add("open");
@@ -2285,9 +2314,7 @@ el.appendixFileInput?.addEventListener("change", async (event) => {
       return;
     }
 
-    const markAsDelivered = isDeliveredToggleChecked(
-      el.appendixExcelDeliveredToggle
-    );
+    const markAsDelivered = await confirmAppendixDelivery();
     const { added, skipped, duplicateValues, duplicateDetails } =
       await addAppendixRecords(rows, markAsDelivered);
     renderAppendixDuplicatesResult({

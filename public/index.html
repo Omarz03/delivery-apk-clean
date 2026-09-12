@@ -369,22 +369,7 @@
             يجب أن يحتوي الملف على نفس أعمدة الجلسة الحالية (بنفس الأسماء). أي
             عمود ناقص سيُترك فارغاً، وأي عمود زائد غير معروف سيُتجاهل.
           </p>
-          <!-- نفس مفتاح "حالة الاستلام" المستخدم بالنافذة الجانبية — تفعيله يعامل كل صفوف الملف كمُستلَمة فعلاً، والمستلم "نفسه" -->
-          <div class="flex items-center gap-3 mb-4">
-            <button
-              id="appendixExcelDeliveredToggle"
-              type="button"
-              class="status-toggle"
-              data-checked="false"
-            >
-              <span class="status-toggle__knob"></span>
-            </button>
-            <span
-              id="appendixExcelDeliveredLabel"
-              class="text-sm font-semibold text-pending"
-              >لم يتم الاستلام</span
-            >
-          </div>
+          <!-- لا مفتاح هنا عمداً — حالة الاستلام لكل الدفعة تُحدَّد عبر نافذة التأكيد الإلزامية التي تظهر فور اختيار الملف -->
           <button
             id="appendixTemplateBtn"
             type="button"
@@ -465,6 +450,44 @@
               />
             </svg>
             تنزيل ملف الأخطاء (الهويات المكررة)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- تنبيه إلزامي عند استيراد ملف Excel كملحق جماعي فقط: يحدّد حالة الاستلام
+       لكل الدفعة (لا مفتاح تبديل بهذا الوضع، هذا التنبيه هو القرار الوحيد).
+       طبقته أعلى من نافذة "إضافة ملحق" نفسها فيبقى ظاهراً حتى لو أُغلقت. -->
+    <div
+      id="appendixDeliveryConfirmOverlay"
+      class="drawer-overlay"
+      style="z-index: 69"
+    ></div>
+    <div
+      id="appendixDeliveryConfirmModal"
+      class="fixed inset-0 z-[70] hidden items-center justify-center p-4"
+    >
+      <div class="bg-white rounded-2xl max-w-sm w-full p-5 sm:p-6">
+        <h3 class="font-display font-bold text-pine text-base mb-2">
+          تأكيد حالة الاستلام
+        </h3>
+        <p class="text-sm text-ink/60 mb-5">
+          هل هذا الملحق تم تسليمه أم هذه إضافة من غير تسليم؟
+        </p>
+        <div class="flex flex-col gap-2">
+          <button
+            id="appendixDeliveryConfirmYes"
+            type="button"
+            class="w-full bg-clay hover:bg-clayLight transition-colors text-white font-semibold text-sm py-2.5 rounded-xl"
+          >
+            نعم، تم الاستلام
+          </button>
+          <button
+            id="appendixDeliveryConfirmNo"
+            type="button"
+            class="w-full bg-white hover:bg-paper transition-colors text-ink/70 font-semibold text-sm py-2.5 rounded-xl border border-line"
+          >
+            لا، لم يستلم بعد
           </button>
         </div>
       </div>
