@@ -866,6 +866,47 @@
           >
             لا توجد نتائج مطابقة للبحث.
           </p>
+
+          <!-- التنقّل بين الصفحات: يمنع رسم كل الصفوف دفعة واحدة لتفادي تعليق المتصفح مع الملفات الكبيرة -->
+          <div
+            id="paginationBar"
+            class="hidden items-center justify-between gap-3 px-4 py-3 border-t border-line text-xs flex-wrap"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-ink/50 font-medium">عرض</span>
+              <select
+                id="pageSizeSelect"
+                class="border border-line rounded-lg py-1.5 px-2 text-xs font-semibold text-ink/70 focus:outline-none focus:ring-2 focus:ring-clay/40 focus:border-clay bg-white"
+              >
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="150">150</option>
+                <option value="200">200</option>
+                <option value="all">الكل</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                id="prevPageBtn"
+                type="button"
+                class="px-3 py-1.5 rounded-lg border border-line text-ink/60 hover:bg-paper hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed font-semibold transition-colors"
+                disabled
+              >
+                السابق
+              </button>
+              <span
+                id="pageIndicator"
+                class="text-ink/50 font-mono font-semibold px-1"
+              ></span>
+              <button
+                id="nextPageBtn"
+                type="button"
+                class="px-3 py-1.5 rounded-lg border border-line text-ink/60 hover:bg-paper hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed font-semibold transition-colors"
+              >
+                التالي
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- زرا الإضافة كملحق والتصدير -->

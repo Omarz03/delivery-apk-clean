@@ -22,6 +22,8 @@ let allColumns = []; // أسماء الأعمدة كما وردت من ملف إ
 let allRecords = []; // نسخة في الذاكرة من كل السجلات (لتسريع البحث والعرض)
 let currentSearch = ""; // نص البحث الحالي
 let currentStatusFilter = null; // null = الكل، true = تم الاستلام، false = لم يتم
+let currentPageSize = 50; // عدد الصفوف المعروضة بكل صفحة؛ Infinity = عرض الكل دفعة واحدة
+let currentPage = 1; // رقم الصفحة الحالية (١-based)
 let openRecordId = null;
 let socket = null; // legacy — kept for compatibility; actual sync via window.deliveryP2P
 let deviceId = null;
@@ -186,6 +188,11 @@ const el = {
   searchInput: document.getElementById("searchInput"),
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
+  paginationBar: document.getElementById("paginationBar"),
+  pageSizeSelect: document.getElementById("pageSizeSelect"),
+  prevPageBtn: document.getElementById("prevPageBtn"),
+  nextPageBtn: document.getElementById("nextPageBtn"),
+  pageIndicator: document.getElementById("pageIndicator"),
   noResults: document.getElementById("noResults"),
   exportBtn: document.getElementById("exportBtn"),
   connectionDot: document.getElementById("connectionDot"),
@@ -1176,7 +1183,27 @@ function renderTableRows() {
   el.noResults.classList.toggle("hidden", filtered.length !== 0);
   updateStatusFilterBar(filtered.length);
 
-  el.tableBody.innerHTML = filtered
+  // تقسيم النتائج المُصفّاة إلى صفحات — يمنع تعليق المتصفح عند رسم آلاف
+  // الصفوف دفعة واحدة. "عرض الكل" (currentPageSize === Infinity) يعطّل
+  // التقسيم فعلياً ويعرض كل النتائج المُصفّاة كما كان الحال سابقاً.
+  const totalPages =
+    currentPageSize === Infinity
+      ? 1
+      : Math.max(1, Math.ceil(filtered.length / currentPageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const pageRecords =
+    currentPageSize === Infinity
+      ? filtered
+      : filtered.slice(
+          (currentPage - 1) * currentPageSize,
+          currentPage * currentPageSize
+        );
+
+  updatePaginationBar(filtered.length, totalPages);
+
+  el.tableBody.innerHTML = pageRecords
     .map((record) => {
       // إن كان السجل مقفلاً من جهاز آخر يعدّله الآن، نعرض شارة القفل بدل
       // شارة الحالة العادية، ونضيف تنسيقاً بصرياً مميزاً للصف بالكامل.
@@ -1213,6 +1240,52 @@ function renderTableRows() {
 
   updateDeliveryCounter();
 }
+
+/**
+ * تحدّث شريط التنقّل أسفل الجدول: تُخفيه كلياً لو لا نتائج، وإلا تعرض رقم
+ * الصفحة الحالية من الإجمالي وتُفعّل/تُعطّل زرّي "التالي"/"السابق" حسب
+ * الموقع الحالي (وتُعطّلهما دائماً بوضع "عرض الكل" لأنه صفحة واحدة فقط).
+ */
+function updatePaginationBar(totalFiltered, totalPages) {
+  if (!el.paginationBar) return;
+
+  el.paginationBar.classList.toggle("hidden", totalFiltered === 0);
+  el.paginationBar.classList.toggle("flex", totalFiltered !== 0);
+  if (totalFiltered === 0) return;
+
+  if (el.pageIndicator) {
+    el.pageIndicator.textContent =
+      currentPageSize === Infinity
+        ? `عرض الكل (${totalFiltered})`
+        : `صفحة ${currentPage} من ${totalPages} (${totalFiltered})`;
+  }
+  if (el.prevPageBtn) {
+    el.prevPageBtn.disabled = currentPageSize === Infinity || currentPage <= 1;
+  }
+  if (el.nextPageBtn) {
+    el.nextPageBtn.disabled =
+      currentPageSize === Infinity || currentPage >= totalPages;
+  }
+}
+
+el.pageSizeSelect?.addEventListener("change", () => {
+  const val = el.pageSizeSelect.value;
+  currentPageSize = val === "all" ? Infinity : Number(val);
+  currentPage = 1;
+  renderTableRows();
+});
+
+el.prevPageBtn?.addEventListener("click", () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    renderTableRows();
+  }
+});
+
+el.nextPageBtn?.addEventListener("click", () => {
+  currentPage += 1;
+  renderTableRows();
+});
 
 // تفويض الحدث (Event Delegation): بدل ربط مستمع نقر بكل صف على حدة،
 // نستمع للنقر على الجدول كاملاً ونحدد الصف المقصود — أداء أفضل مع آلاف الصفوف.
@@ -1261,6 +1334,7 @@ elRowSearch.toggle.addEventListener("click", () => {
   } else {
     currentRowFilter = null;
     elRowSearch.input.value = "";
+    currentPage = 1;
     renderTableRows();
     updateClearBtnVisibility();
   }
@@ -1269,6 +1343,7 @@ elRowSearch.toggle.addEventListener("click", () => {
 elRowSearch.input.addEventListener("input", () => {
   const val = parseInt(elRowSearch.input.value, 10);
   currentRowFilter = !isNaN(val) && val > 0 ? val : null;
+  currentPage = 1;
   renderTableRows();
   updateClearBtnVisibility();
 });
@@ -1279,12 +1354,14 @@ elRowSearch.clearBtn.addEventListener("click", () => {
   el.searchInput.value = "";
   elRowSearch.input.value = "";
   elRowSearch.wrapper.classList.add("hidden");
+  currentPage = 1;
   renderTableRows();
   updateClearBtnVisibility();
 });
 
 el.searchInput.addEventListener("input", (event) => {
   currentSearch = event.target.value;
+  currentPage = 1;
   renderTableRows();
   updateClearBtnVisibility();
 });
@@ -1333,6 +1410,7 @@ el.statusFilterClearBtn?.addEventListener("click", () =>
 
 function setStatusFilter(key) {
   currentStatusFilter = statusFilterMap[key] ?? null;
+  currentPage = 1;
   document.querySelectorAll(".status-filter-btn").forEach((btn) => {
     const isActive = btn.dataset.statusFilter === key;
     const wasHidden = btn.classList.contains("hidden"); // نحافظ على إخفاء زر "ملحق" إن لم تتوفر سجلات ملحق
