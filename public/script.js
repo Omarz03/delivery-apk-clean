@@ -1372,6 +1372,30 @@ el.searchInput.addEventListener("input", (event) => {
   updateClearBtnVisibility();
 });
 
+/**
+ * اهتزاز خفيف كتغذية راجعة للمس. داخل APK يستخدم Capacitor Haptics؛ على الويب
+ * يستخدم navigator.vibrate (أندرويد فقط — iOS Safari لا يدعمه). لا يرمي أخطاء أبداً.
+ * kind: "select" (نقرة خفيفة) | "success" (تم التسليم) | "warning" (تنبيه)
+ */
+function haptic(kind) {
+  try {
+    const plugin = window.Capacitor?.Plugins?.Haptics;
+    if (plugin) {
+      if (kind === "success") plugin.notification({ type: "SUCCESS" });
+      else if (kind === "warning") plugin.notification({ type: "WARNING" });
+      else plugin.impact({ style: "LIGHT" });
+      return;
+    }
+    if (navigator.vibrate) {
+      navigator.vibrate(
+        kind === "success" ? [15, 40, 25] : kind === "warning" ? [40, 60, 40] : 10
+      );
+    }
+  } catch (_) {
+    /* الاهتزاز تحسين اختياري — نتجاهل أي فشل */
+  }
+}
+
 /* -------------------------------------------------------------------------
                   تصفية حسب حالة الاستلام (الكل / تم الاستلام / لم يتم الاستلام)
                   ------------------------------------------------------------------------- */
@@ -1390,13 +1414,10 @@ function updateStatusFilterBar(count) {
   const hasAppendix = allRecords.some((r) => r.__isAppendix === true);
 
   if (el.appendixFilterBtn) {
-    el.appendixFilterBtn.classList.toggle("hidden", !hasAppendix);
-    // لو اختفى آخر سجل ملحق بينما فلتر "ملحق" هو المُفعّل حالياً، نرجع
-    // تلقائياً لفلتر "الكل" حتى لا يبقى الجدول عالقاً بحالة فارغة دائمة.
-    if (!hasAppendix && currentStatusFilter === "appendix") {
-      setStatusFilter("all");
-      return; // setStatusFilter تنادي renderTableRows من جديد وتحدّث العداد بنفسها
-    }
+    // الزر ظاهر دائماً مع عدّاد السجلات الملحقة؛ يُخفَّف لونه لو ما فيه ملحق.
+    const appendixCount = allRecords.filter((r) => r.__isAppendix === true).length;
+    el.appendixFilterBtn.textContent = `ملحق (${appendixCount})`;
+    el.appendixFilterBtn.classList.toggle("opacity-50", !hasAppendix);
   }
 
   if (el.statusFilterClearBtn) {
@@ -1419,13 +1440,15 @@ function setStatusFilter(key) {
   currentPage = 1;
   document.querySelectorAll(".status-filter-btn").forEach((btn) => {
     const isActive = btn.dataset.statusFilter === key;
-    const wasHidden = btn.classList.contains("hidden"); // نحافظ على إخفاء زر "ملحق" إن لم تتوفر سجلات ملحق
+    const wasHidden = btn.classList.contains("hidden");
+    const wasDimmed = btn.classList.contains("opacity-50");
     btn.className = `status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
       isActive
         ? "bg-pine text-white"
         : "text-ink/55 hover:bg-paper hover:text-ink"
-    }${wasHidden ? " hidden" : ""}`;
+    }${wasHidden ? " hidden" : ""}${wasDimmed ? " opacity-50" : ""}`;
   });
+  haptic("select");
   renderTableRows();
 }
 
@@ -1642,6 +1665,7 @@ el.statusToggle.addEventListener("click", () => {
   const currentlyChecked = el.statusToggle.dataset.checked === "true";
   const nextChecked = !currentlyChecked;
   setStatusToggle(nextChecked);
+  haptic("select");
 
   // معاينة حية لسطر "تم التسليم..." فور التبديل، قبل الحفظ الفعلي حتى —
   // حتى يشوف المستخدم النتيجة أثناء التسليم مباشرة وليس بعد إغلاق النافذة.
@@ -1728,6 +1752,7 @@ el.drawerSave.addEventListener("click", async () => {
             )})`
         )
         .join("\n");
+      haptic("warning");
       const proceed = window.confirm(
         `⚠ تنبيه: احتمال تسليم مزدوج\n\nنفس رقم الهوية مُسجَّل "تم الاستلام" مسبقاً:\n${details}\n\nهل تريد تأكيد تسليم هذا السجل رغم ذلك؟`
       );
@@ -1752,6 +1777,7 @@ el.drawerSave.addEventListener("click", async () => {
 
   renderTableRows();
   closeDrawer();
+  if (statusChecked && !wasDelivered) haptic("success");
 
   // بثّ هذا التحديث فوراً لبقية الأجهزة المتصلة (إن وُجد اتصال بالخادم)
   broadcastRecordUpdate(updated);

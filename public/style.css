@@ -714,3 +714,144 @@ textarea:focus-visible {
   cursor: pointer;
 }
 .btn-secondary:hover { background: #F4F5F1; }
+
+/* -------------------- منع زوم iOS التلقائي عند التركيز على الحقول --------------------
+   iOS Safari يكبّر الصفحة عندما يكون حجم خط الحقل أقل من 16px. */
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* -------------------- زر الإجراءات الجانبي العائم -------------------- */
+.fab-dock {
+  position: fixed;
+  right: 12px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  direction: rtl;
+}
+.fab-toggle {
+  width: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  background: #1F2E2A;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(26, 33, 30, 0.3);
+  transition: transform 150ms, background 150ms;
+}
+.fab-toggle:active { transform: scale(0.94); }
+.fab-dock.is-open .fab-toggle { background: #B5561F; }
+.fab-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transform-origin: bottom right;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 150ms, transform 150ms, visibility 150ms;
+}
+.fab-dock.is-open .fab-menu {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  visibility: visible;
+}
+.fab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: row-reverse;
+  background: transparent;
+}
+.fab-label {
+  background: #fff;
+  color: #1A211E;
+  border: 1px solid #DAD9D0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(26, 33, 30, 0.15);
+  white-space: nowrap;
+}
+.fab-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: #fff;
+  color: #1F2E2A;
+  border: 1px solid #DAD9D0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(26, 33, 30, 0.2);
+}
+.fab-item--primary .fab-icon { background: #1F2E2A; color: #fff; border-color: #1F2E2A; }
+/* مساحة أسفل الصفحة كي لا يغطي الزر آخر الجدول */
+main { padding-bottom: 88px; }
+
+/* -------------------- الجدول: تثبيت أول عمودين (الحالة + أول عمود بيانات) أثناء السحب الأفقي --------------------
+   الصفحة RTL فالعمودان عند الطرف الأيمن؛ عرض كل منهما 44px (انظر أعلاه). */
+#tableHead th:first-child,
+#tableBody td:first-child,
+#tableHead th:nth-child(2),
+#tableBody td:nth-child(2) {
+  position: sticky;
+  z-index: 2;
+}
+#tableHead th:first-child,
+#tableBody td:first-child { right: 0; }
+#tableHead th:nth-child(2),
+#tableBody td:nth-child(2) {
+  right: 44px;
+  box-shadow: -6px 0 6px -6px rgba(26, 33, 30, 0.18);
+}
+#tableHead th:first-child,
+#tableHead th:nth-child(2) { z-index: 3; background: #f4f5f1; }
+#tableBody td:first-child,
+#tableBody td:nth-child(2) { background: #fff; }
+#tableBody tr:hover td:first-child,
+#tableBody tr:hover td:nth-child(2) { background: #f9f8f4; }
+#tableBody tr.row-locked td:first-child,
+#tableBody tr.row-locked td:nth-child(2),
+#tableBody tr.row-locked:hover td:first-child,
+#tableBody tr.row-locked:hover td:nth-child(2) { background: #f2f0ea; }
+#tableBody tr.bg-clay\/10 td:first-child,
+#tableBody tr.bg-clay\/10 td:nth-child(2) { background: #f6eee9; }
+
+/* -------------------- أهداف اللمس: 40-44px على الشاشات التي تعمل باللمس -------------------- */
+@media (pointer: coarse) {
+  #tableBody td { padding-top: 14px; padding-bottom: 14px; }
+  .status-filter-btn {
+    min-height: 40px;
+    padding-left: 14px;
+    padding-right: 14px;
+    font-size: 13px;
+  }
+  #statusFilterClearBtn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  #paginationBar button,
+  #paginationBar select {
+    min-height: 44px;
+  }
+  #paginationBar button { padding-left: 16px; padding-right: 16px; font-size: 13px; }
+  #paginationBar select { padding-left: 12px; padding-right: 12px; }
+}
+@media (pointer: coarse) {
+  #statusFilterBar > div:first-child { flex-wrap: wrap; }
+}

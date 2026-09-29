@@ -836,7 +836,7 @@
             <button
               id="appendixFilterBtn"
               data-status-filter="appendix"
-              class="status-filter-btn hidden px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors text-ink/55 hover:bg-paper hover:text-ink"
+              class="status-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors text-ink/55 hover:bg-paper hover:text-ink"
             >
               ملحق
             </button>
@@ -932,68 +932,24 @@
           </div>
         </div>
 
-        <!-- زرا الإضافة كملحق والتصدير -->
-        <div class="flex justify-between items-center gap-3 flex-wrap">
-          <div class="flex items-center gap-2.5 flex-wrap">
-            <button
-              id="appendixBtn"
-              class="inline-flex items-center gap-2 bg-white hover:bg-paper border border-line transition-colors text-ink font-semibold text-sm px-4 py-3 rounded-xl"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              إضافة ملحق
+        <!-- أزرار الإجراءات: زر جانبي عائم يفتح قائمة (إضافة ملحق / تقرير / تصدير) -->
+        <div id="fabDock" class="fab-dock">
+          <div id="fabMenu" class="fab-menu" role="menu" aria-hidden="true">
+            <button id="exportBtn" class="fab-item fab-item--primary" role="menuitem">
+              <span class="fab-label">تصدير كملف Excel</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg></span>
             </button>
-            <button
-              id="reportBtn"
-              class="inline-flex items-center gap-2 bg-white hover:bg-paper border border-line transition-colors text-ink font-semibold text-sm px-4 py-3 rounded-xl"
-              title="تقرير ختام الجلسة"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M9 17V9M13 17v-5M17 17v-8M4 21h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1Z"
-                />
-              </svg>
-              تقرير الجلسة
+            <button id="reportBtn" class="fab-item" role="menuitem" title="تقرير ختام الجلسة">
+              <span class="fab-label">تقرير الجلسة</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17V9M13 17v-5M17 17v-8M4 21h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1Z"/></svg></span>
+            </button>
+            <button id="appendixBtn" class="fab-item" role="menuitem">
+              <span class="fab-label">إضافة ملحق</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
             </button>
           </div>
-          <button
-            id="exportBtn"
-            class="inline-flex items-center gap-2 bg-pine hover:bg-pineLight transition-colors text-white font-semibold text-sm px-5 py-3 rounded-xl"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M12 3v12M12 15l-4-4M12 15l4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"
-                transform="rotate(180 12 12)"
-              />
-            </svg>
-            تصدير كملف Excel
+          <button id="fabToggle" class="fab-toggle" aria-label="الإجراءات" aria-expanded="false" aria-controls="fabMenu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
         </div>
       </section>
@@ -1260,6 +1216,32 @@
             }
           );
         });
+    </script>
+
+    <script>
+      // زر الإجراءات العائم: فتح/إغلاق القائمة
+      (function () {
+        var dock = document.getElementById("fabDock");
+        var toggle = document.getElementById("fabToggle");
+        var menu = document.getElementById("fabMenu");
+        if (!dock || !toggle) return;
+        function setOpen(open) {
+          dock.classList.toggle("is-open", open);
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+          menu.setAttribute("aria-hidden", open ? "false" : "true");
+        }
+        toggle.addEventListener("click", function (e) {
+          e.stopPropagation();
+          setOpen(!dock.classList.contains("is-open"));
+        });
+        menu.addEventListener("click", function () { setOpen(false); });
+        document.addEventListener("click", function (e) {
+          if (!dock.contains(e.target)) setOpen(false);
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") setOpen(false);
+        });
+      })();
     </script>
   </body>
 </html>
