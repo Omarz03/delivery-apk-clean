@@ -1524,3 +1524,45 @@ html[data-theme="dark"] .fab-dock .fab-item:focus-visible { background: var(--d-
 html[data-theme="dark"] .fab-dock .fab-icon { background: var(--d-surface-2); color: #a9d8c4; }
 html[data-theme="dark"] .fab-dock .fab-item--primary .fab-icon { background: #2f855a; color: #fff; }
 .fab-dock .fab-item { min-height: 48px; align-items: center; }
+
+/* ---- أزرار تكبير/تصغير الخط داخل القائمة ---- */
+.fab-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 10px;
+  border-top: 1px solid var(--c-line);
+  margin-top: 4px;
+}
+.fab-stepper__label { flex: 1; font-size: 14px; font-weight: 600; color: var(--c-ink); }
+.fab-stepper__value {
+  min-width: 46px;
+  text-align: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(26, 33, 30, 0.7);
+}
+.fab-stepper__btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--c-line);
+  background: var(--c-paper);
+  color: var(--c-pine);
+  font-weight: 800;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1;
+}
+.fab-stepper__btn--big { font-size: 19px; }
+.fab-stepper__btn small { font-size: 12px; font-weight: 800; }
+.fab-stepper__btn:active:not(:disabled) { transform: scale(0.94); }
+.fab-stepper__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+html[data-theme="dark"] .fab-stepper { border-top-color: var(--d-line); }
+html[data-theme="dark"] .fab-stepper__label { color: var(--d-text); }
+html[data-theme="dark"] .fab-stepper__value { color: rgba(230, 235, 232, 0.7); }
+html[data-theme="dark"] .fab-stepper__btn { background: var(--d-surface-2); color: #a9d8c4; border-color: var(--d-line); }

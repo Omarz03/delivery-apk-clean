@@ -2146,27 +2146,38 @@ document.addEventListener(
   true
 );
 
-/* ---- حجم الخط (إتاحة وصول): 3 مستويات تُحفظ على الجهاز ---- */
-const FONT_LEVELS = [
-  { zoom: 1, label: "عادي" },
-  { zoom: 1.12, label: "كبير" },
-  { zoom: 1.25, label: "كبير جداً" },
-];
-function applyFontLevel(i) {
-  document.documentElement.style.zoom = String(FONT_LEVELS[i].zoom);
+/* ---- حجم الخط (إتاحة وصول): تكبير/تصغير بخطوات 10% من 80% إلى 150% ---- */
+const FONT_MIN = 0.8;
+const FONT_MAX = 1.5;
+const FONT_STEP = 0.1;
+function currentFontScale() {
+  let v = 1;
+  try {
+    v = Number(localStorage.getItem("tam-font-scale")) || 1;
+  } catch (_) {}
+  return Math.min(FONT_MAX, Math.max(FONT_MIN, v));
 }
-document.getElementById("fontSizeBtn")?.addEventListener("click", () => {
-  let i = 0;
+function applyFontScale(v) {
+  v = Math.round(v * 10) / 10;
+  document.documentElement.style.zoom = String(v);
+  const label = document.getElementById("fontScaleLabel");
+  if (label) label.textContent = `${Math.round(v * 100)}%`;
+  const down = document.getElementById("fontDownBtn");
+  const up = document.getElementById("fontUpBtn");
+  if (down) down.disabled = v <= FONT_MIN + 0.001;
+  if (up) up.disabled = v >= FONT_MAX - 0.001;
+  return v;
+}
+function stepFontScale(delta) {
+  const v = applyFontScale(currentFontScale() + delta);
   try {
-    i = Number(localStorage.getItem("tam-font-level")) || 0;
+    localStorage.setItem("tam-font-scale", String(v));
   } catch (_) {}
-  i = (i + 1) % FONT_LEVELS.length;
-  applyFontLevel(i);
-  try {
-    localStorage.setItem("tam-font-level", String(i));
-  } catch (_) {}
-  showToast(`حجم الخط: ${FONT_LEVELS[i].label}`, "info", 1800);
-});
+  haptic("select");
+}
+applyFontScale(currentFontScale());
+document.getElementById("fontDownBtn")?.addEventListener("click", () => stepFontScale(-FONT_STEP));
+document.getElementById("fontUpBtn")?.addEventListener("click", () => stepFontScale(FONT_STEP));
 
 /* ---- تلميح خانة الحالة: عنصر واحد ثابت (fixed) لا يقصّه تمرير الجدول ---- */
 (function setupStatusTip() {

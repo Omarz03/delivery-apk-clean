@@ -23,8 +23,8 @@
         }
         document.documentElement.setAttribute("data-theme", t);
         try {
-          var fl = [1, 1.12, 1.25][Number(localStorage.getItem("tam-font-level")) || 0];
-          if (fl) document.documentElement.style.zoom = String(fl);
+          var fl = Number(localStorage.getItem("tam-font-scale"));
+          if (fl >= 0.8 && fl <= 1.5) document.documentElement.style.zoom = String(fl);
         } catch (e) {}
       })();
     </script>
@@ -850,10 +850,12 @@
               <span class="fab-label">سجل النشاط</span>
               <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></span>
             </button>
-            <button id="fontSizeBtn" class="fab-item" role="menuitem">
-              <span class="fab-label">حجم الخط</span>
-              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 5l6 15M6.5 14h7M17 20l3-8 2 8"/></svg></span>
-            </button>
+            <div class="fab-stepper" role="group" aria-label="حجم الخط">
+              <span class="fab-stepper__label">حجم الخط</span>
+              <button id="fontDownBtn" type="button" class="fab-stepper__btn" dir="ltr" aria-label="تصغير الخط">A<small>−</small></button>
+              <span id="fontScaleLabel" class="fab-stepper__value" aria-live="polite">100%</span>
+              <button id="fontUpBtn" type="button" class="fab-stepper__btn fab-stepper__btn--big" dir="ltr" aria-label="تكبير الخط">A<small>+</small></button>
+            </div>
             <button id="appendixBtn" class="fab-item" role="menuitem">
               <span class="fab-label">إضافة ملحق</span>
               <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
@@ -1316,7 +1318,10 @@
           e.stopPropagation();
           setOpen(!dock.classList.contains("is-open"));
         });
-        menu.addEventListener("click", function () { setOpen(false); });
+        menu.addEventListener("click", function (e) {
+          if (e.target.closest(".fab-stepper")) return; // نبقي القائمة مفتوحة أثناء تغيير الحجم
+          setOpen(false);
+        });
         document.addEventListener("click", function (e) {
           if (!dock.contains(e.target)) setOpen(false);
         });
