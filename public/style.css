@@ -1566,3 +1566,8 @@ html[data-theme="dark"] .fab-stepper { border-top-color: var(--d-line); }
 html[data-theme="dark"] .fab-stepper__label { color: var(--d-text); }
 html[data-theme="dark"] .fab-stepper__value { color: rgba(230, 235, 232, 0.7); }
 html[data-theme="dark"] .fab-stepper__btn { background: var(--d-surface-2); color: #a9d8c4; border-color: var(--d-line); }
+
+/* لون الحقول الأصلي يتبع وضع التطبيق (لا وضع النظام) — كانت حقول "إضافة ملحق" تظهر رمادية داكنة */
+:root { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) { background-color: #fff; }
