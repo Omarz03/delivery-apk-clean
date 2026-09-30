@@ -1173,10 +1173,14 @@ function updateDeliveryCounter() {
   el.counterBar.classList.toggle("hidden", total === 0);
 }
 
+const ROW_DELETE_ICON =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
+
 function buildTableHead() {
-  const headerCells = ["الحالة", ...allColumns]
-    .map((col) => `<th>${escapeHtml(col)}</th>`)
-    .join("");
+  const headerCells =
+    ["الحالة", ...allColumns]
+      .map((col) => `<th>${escapeHtml(col)}</th>`)
+      .join("") + '<th class="row-actions-cell" aria-label="حذف"></th>';
   el.tableHead.innerHTML = `<tr>${headerCells}</tr>`;
 }
 
@@ -1263,7 +1267,9 @@ function renderTableRows() {
       const appendixClass = record.__isAppendix ? " bg-clay/10" : "";
       return `<tr data-id="${
         record.id
-      }" class="${lockedClass}${appendixClass}">${`<td>${statusCell}</td>`}${dataCells}</tr>`;
+      }" class="${lockedClass}${appendixClass}">${`<td>${statusCell}</td>`}${dataCells}<td class="row-actions-cell"><button type="button" class="row-delete-btn" data-delete-id="${
+        record.id
+      }" aria-label="حذف السجل" title="حذف السجل">${ROW_DELETE_ICON}</button></td></tr>`;
     })
     .join("");
 
@@ -1319,6 +1325,20 @@ el.nextPageBtn?.addEventListener("click", () => {
 // تفويض الحدث (Event Delegation): بدل ربط مستمع نقر بكل صف على حدة،
 // نستمع للنقر على الجدول كاملاً ونحدد الصف المقصود — أداء أفضل مع آلاف الصفوف.
 el.tableBody.addEventListener("click", (event) => {
+  // زر الحذف المباشر بالصف: لا يفتح النافذة الجانبية
+  const delBtn = event.target.closest(".row-delete-btn");
+  if (delBtn) {
+    event.stopPropagation();
+    const target = allRecords.find((r) => r.id === Number(delBtn.dataset.deleteId));
+    const rowLock = target && lockedRecords.get(target.__syncId);
+    if (rowLock) {
+      showToast(`قيد التعديل من: ${rowLock.deviceName}`, "error", 2500);
+      return;
+    }
+    openDeleteModal(Number(delBtn.dataset.deleteId));
+    return;
+  }
+
   const row = event.target.closest("tr[data-id]");
   if (!row) return;
 
@@ -1827,9 +1847,13 @@ async function deleteRecordLocally(record, timestamp) {
 const deleteModalEl = document.getElementById("deleteModal");
 const deleteModalOverlayEl = document.getElementById("deleteModalOverlay");
 
-function openDeleteModal() {
-  const record = allRecords.find((r) => r.id === openRecordId);
+let deleteTargetId = null;
+
+/** يفتح نافذة التأكيد للسجل المعطى، أو للسجل المفتوح بالنافذة الجانبية. */
+function openDeleteModal(recordId = openRecordId) {
+  const record = allRecords.find((r) => r.id === recordId);
   if (!record) return;
+  deleteTargetId = record.id;
 
   // ملخص يساعد المستخدم على التأكد أنه يحذف السجل الصحيح
   const summary = allColumns
@@ -1864,7 +1888,9 @@ function closeDeleteModal() {
   deleteModalOverlayEl.classList.remove("open");
 }
 
-document.getElementById("drawerDelete")?.addEventListener("click", openDeleteModal);
+document
+  .getElementById("drawerDelete")
+  ?.addEventListener("click", () => openDeleteModal(openRecordId));
 document.getElementById("deleteCancelBtn")?.addEventListener("click", closeDeleteModal);
 deleteModalOverlayEl?.addEventListener("click", closeDeleteModal);
 deleteModalEl?.addEventListener("click", (event) => {
@@ -1885,15 +1911,16 @@ document.addEventListener(
 document
   .getElementById("deleteConfirmBtn")
   ?.addEventListener("click", async () => {
-    const record = allRecords.find((r) => r.id === openRecordId);
+    const record = allRecords.find((r) => r.id === deleteTargetId);
     closeDeleteModal();
+    deleteTargetId = null;
     if (!record) return;
 
     const btn = document.getElementById("deleteConfirmBtn");
     btn.disabled = true;
     try {
-      // نغلق النافذة الجانبية أولاً كي يُبثّ فك القفل قبل أن يختفي السجل من الذاكرة
-      closeDrawer();
+      // لو هذا السجل مفتوح بالنافذة الجانبية نغلقها أولاً كي يُبثّ فك القفل
+      if (openRecordId === record.id) closeDrawer();
       const tomb = await deleteRecordLocally(record, Date.now());
       renderApp();
       broadcastRecordUpdate(tomb);

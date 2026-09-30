@@ -923,3 +923,35 @@ main { padding-bottom: 88px; }
 .delete-modal__btn--cancel { border: 1px solid #dad9d0; color: #1a211e; background: #fff; }
 .delete-modal__btn--danger { background: #9c4221; color: #fff; }
 .delete-modal__btn--danger:disabled { opacity: 0.6; }
+
+/* -------------------- زر الحذف المباشر بالصف (عمود ثابت عند الحافة اليسرى) -------------------- */
+#tableHead th.row-actions-cell,
+#tableBody td.row-actions-cell {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  padding: 0 4px;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 6px 0 6px -6px rgba(26, 33, 30, 0.18);
+}
+#tableHead th.row-actions-cell { background: #f4f5f1; z-index: 3; }
+#tableBody tr:hover td.row-actions-cell { background: #f9f8f4; }
+#tableBody tr.row-locked td.row-actions-cell { background: #f2f0ea; }
+#tableBody tr.bg-clay\/10 td.row-actions-cell { background: #f6eee9; }
+.row-delete-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(26, 33, 30, 0.4);
+  transition: color 120ms, background 120ms;
+}
+.row-delete-btn:hover,
+.row-delete-btn:focus-visible { color: #9c4221; background: rgba(156, 66, 33, 0.1); }
+.row-delete-btn:active { background: rgba(156, 66, 33, 0.2); }
