@@ -163,8 +163,8 @@ p2p.addEventListener('channel-open', async () => {
   p2p.send('device-hello', { deviceId: window.deviceId, deviceName: window.deviceName });
 
   // نفس منطق performInitialSync في script.js لكن عبر P2P
-  if (window.allRecords && window.allRecords.length > 0) {
-    p2p.send('client-data', { records: window.allRecords, columns: window.allColumns });
+  if (window.allRecordsForSync && window.allRecordsForSync.length > 0) {
+    p2p.send('client-data', { records: window.allRecordsForSync, columns: window.allColumns });
   }
   p2p.send('request-all-data', {});
 });
@@ -236,15 +236,15 @@ async function handleP2PMessage({ type, payload }) {
       }
       if (changed) window.renderApp?.();
       // نرد بنسختنا المحدّثة
-      if (window.allRecords?.length) {
-        p2p.send('send-all-data', { records: window.allRecords, columns: window.allColumns });
+      if (window.allRecordsForSync?.length) {
+        p2p.send('send-all-data', { records: window.allRecordsForSync, columns: window.allColumns });
       }
       break;
     }
 
     case 'request-all-data': {
-      if (window.allRecords?.length) {
-        p2p.send('send-all-data', { records: window.allRecords, columns: window.allColumns });
+      if (window.allRecordsForSync?.length) {
+        p2p.send('send-all-data', { records: window.allRecordsForSync, columns: window.allColumns });
       }
       break;
     }

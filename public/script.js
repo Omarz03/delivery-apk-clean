@@ -97,6 +97,7 @@ function replaceAllRecords(records, columns) {
     const metaStore = tx.objectStore(STORE_META);
 
     recordsStore.clear();
+    tombstones.clear();
     records.forEach((record) => recordsStore.add(record));
     metaStore.put({ key: "columns", value: columns });
 
@@ -105,14 +106,34 @@ function replaceAllRecords(records, columns) {
   });
 }
 
-/** قراءة كل السجلات المخزّنة حالياً في IndexedDB. */
-function getAllRecords() {
+/**
+ * "شواهد الحذف" (tombstones): عند حذف سجل لا نمسحه فيزيائياً بل نستبدله بسجل
+ * صغير { __syncId, __deleted: true, __updatedAt } يبقى بالقاعدة ويُزامَن مع بقية
+ * الأجهزة — وإلا لأعاد أي جهاز ما زال يحمل السجل "إحياءه" عند إعادة الاتصال.
+ * الخريطة: syncId → سجل الشاهد.
+ */
+let tombstones = new Map();
+
+/** قراءة كل الصفوف الخام (سجلات حيّة + شواهد حذف) من IndexedDB. */
+function readAllRawRows() {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_RECORDS, "readonly");
     const request = tx.objectStore(STORE_RECORDS).getAll();
     request.onsuccess = () => resolve(request.result);
     request.onerror = (event) => reject(event.target.error);
   });
+}
+
+/** قراءة السجلات الحيّة فقط (بدون شواهد الحذف) وتحديث خريطة الشواهد. */
+async function getAllRecords() {
+  const raw = await readAllRawRows();
+  const live = raw.filter((r) => !r.__deleted);
+  const liveSyncIds = new Set(live.map((r) => r.__syncId));
+  tombstones = new Map();
+  raw
+    .filter((r) => r.__deleted && !liveSyncIds.has(r.__syncId))
+    .forEach((t) => tombstones.set(t.__syncId, t));
+  return live;
 }
 
 /** قراءة قيمة وصفية (مثل ترتيب الأعمدة) من مخزن meta. */
@@ -165,6 +186,7 @@ function clearAllData() {
     const tx = db.transaction([STORE_RECORDS, STORE_META], "readwrite");
     tx.objectStore(STORE_RECORDS).clear();
     tx.objectStore(STORE_META).clear();
+    tombstones.clear();
     tx.oncomplete = () => resolve();
     tx.onerror = (event) => reject(event.target.error);
   });
@@ -941,6 +963,7 @@ async function addAppendixRecords(rawRows, markAsDelivered = false) {
     const localId = await addSingleRecord(record);
     const saved = { ...record, id: localId };
     allRecords.push(saved);
+    tombstones.delete(syncId); // إعادة إضافة سجل كان محذوفاً تُلغي شاهد الحذف
     recordsBySyncId.set(syncId, saved);
     newRecords.push(saved);
   }
@@ -1784,6 +1807,107 @@ el.drawerSave.addEventListener("click", async () => {
 });
 
 /* -------------------------------------------------------------------------
+                  8b) حذف سجل (مع نافذة تحذير + مزامنة الحذف مع بقية الأجهزة)
+                  ------------------------------------------------------------------------- */
+
+/** يستبدل السجل بشاهد حذف (يبقى بالقاعدة كي يُزامَن) ويزيله من الذاكرة. */
+async function deleteRecordLocally(record, timestamp) {
+  const tomb = {
+    id: record.id,
+    __syncId: record.__syncId,
+    __deleted: true,
+    __updatedAt: timestamp,
+  };
+  await updateRecord(tomb); // put بنفس المفتاح: يستبدل الصف الأصلي
+  allRecords = allRecords.filter((r) => r.id !== record.id);
+  tombstones.set(tomb.__syncId, tomb);
+  return tomb;
+}
+
+const deleteModalEl = document.getElementById("deleteModal");
+const deleteModalOverlayEl = document.getElementById("deleteModalOverlay");
+
+function openDeleteModal() {
+  const record = allRecords.find((r) => r.id === openRecordId);
+  if (!record) return;
+
+  // ملخص يساعد المستخدم على التأكد أنه يحذف السجل الصحيح
+  const summary = allColumns
+    .slice(0, 3)
+    .map((col) => record[col])
+    .filter((v) => v !== undefined && v !== null && String(v).trim() !== "")
+    .join(" — ");
+  document.getElementById("deleteModalSummary").textContent =
+    summary || "السجل المحدد";
+
+  const extra = [];
+  if (record.__status) {
+    extra.push("هذا السجل مسجَّل «تم الاستلام» — حذفه سيغيّر إحصائيات التقرير.");
+  }
+  if (window.deliveryP2P?.role) {
+    extra.push("سيُحذف أيضاً من الأجهزة المتصلة بالجلسة.");
+  }
+  const extraEl = document.getElementById("deleteModalExtra");
+  extraEl.innerHTML = extra.map((t) => `<li>${escapeHtml(t)}</li>`).join("");
+  extraEl.classList.toggle("hidden", extra.length === 0);
+
+  deleteModalEl.classList.add("open");
+  deleteModalEl.setAttribute("aria-hidden", "false");
+  deleteModalOverlayEl.classList.add("open");
+  haptic("warning");
+  document.getElementById("deleteCancelBtn").focus();
+}
+
+function closeDeleteModal() {
+  deleteModalEl.classList.remove("open");
+  deleteModalEl.setAttribute("aria-hidden", "true");
+  deleteModalOverlayEl.classList.remove("open");
+}
+
+document.getElementById("drawerDelete")?.addEventListener("click", openDeleteModal);
+document.getElementById("deleteCancelBtn")?.addEventListener("click", closeDeleteModal);
+deleteModalOverlayEl?.addEventListener("click", closeDeleteModal);
+deleteModalEl?.addEventListener("click", (event) => {
+  if (event.target === deleteModalEl) closeDeleteModal();
+});
+// Escape يغلق نافذة التأكيد أولاً (قبل أن يغلق النافذة الجانبية خلفها)
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key === "Escape" && deleteModalEl.classList.contains("open")) {
+      event.stopImmediatePropagation();
+      closeDeleteModal();
+    }
+  },
+  true
+);
+
+document
+  .getElementById("deleteConfirmBtn")
+  ?.addEventListener("click", async () => {
+    const record = allRecords.find((r) => r.id === openRecordId);
+    closeDeleteModal();
+    if (!record) return;
+
+    const btn = document.getElementById("deleteConfirmBtn");
+    btn.disabled = true;
+    try {
+      // نغلق النافذة الجانبية أولاً كي يُبثّ فك القفل قبل أن يختفي السجل من الذاكرة
+      closeDrawer();
+      const tomb = await deleteRecordLocally(record, Date.now());
+      renderApp();
+      broadcastRecordUpdate(tomb);
+      haptic("warning");
+      showToast("تم حذف السجل", "success", 2500);
+    } catch (error) {
+      console.error(error);
+      showToast("تعذّر حذف السجل", "error", 3500);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+/* -------------------------------------------------------------------------
                   9) تصدير البيانات كملف Excel محدث
                   ------------------------------------------------------------------------- */
 el.exportBtn.addEventListener("click", () => {
@@ -2471,6 +2595,39 @@ async function upsertBySyncId(remoteRecord) {
   const localIndex = allRecords.findIndex(
     (r) => r.__syncId === remoteRecord.__syncId
   );
+  const tomb = tombstones.get(remoteRecord.__syncId);
+
+  // وارد: شاهد حذف من جهاز آخر
+  if (remoteRecord.__deleted) {
+    if (localIndex === -1) {
+      if (!tomb) {
+        const { id, ...rest } = remoteRecord;
+        const newId = await addSingleRecord(rest);
+        tombstones.set(rest.__syncId, { ...rest, id: newId });
+      }
+      return false;
+    }
+    const local = allRecords[localIndex];
+    // "الأحدث يفوز": لو عدّلنا السجل محلياً بعد لحظة الحذف نُبقيه
+    if ((remoteRecord.__updatedAt || 0) < (local.__updatedAt || 0)) return false;
+    if (openRecordId === local.id) {
+      closeDrawer();
+      showToast("تم حذف هذا السجل من جهاز آخر", "info", 3000);
+    }
+    await deleteRecordLocally(local, remoteRecord.__updatedAt);
+    return true;
+  }
+
+  // وارد: سجل حيّ لكن عندنا شاهد حذف له → يفوز الأحدث (تعديل بعد الحذف يُحيي السجل)
+  if (tomb) {
+    if ((remoteRecord.__updatedAt || 0) <= (tomb.__updatedAt || 0)) return false;
+    const { id, ...rest } = remoteRecord;
+    const revived = { ...rest, id: tomb.id };
+    await updateRecord(revived);
+    allRecords.push(revived);
+    tombstones.delete(revived.__syncId);
+    return true;
+  }
 
   if (localIndex === -1) {
     const { id, ...withoutLocalId } = remoteRecord; // المعرّف المحلي خاص بكل جهاز
@@ -2522,6 +2679,11 @@ async function applyIncomingFullDataset(
                   10b) تصدير الدوال لـ sync-bridge.js (WebRTC P2P)
                   ------------------------------------------------------------------------- */
 window.upsertBySyncId = upsertBySyncId;
+// السجلات الحيّة + شواهد الحذف: هذا ما يجب أن يُرسل عند المزامنة الكاملة
+Object.defineProperty(window, "allRecordsForSync", {
+  get: () => [...allRecords, ...tombstones.values()],
+  configurable: true,
+});
 window.replaceAllRecords = replaceAllRecords;
 window.getAllRecords = getAllRecords;
 window.renderApp = renderApp;
