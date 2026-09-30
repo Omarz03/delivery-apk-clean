@@ -1135,13 +1135,15 @@ header.bg-pine {
    عمودا الحالة والاسم مثبّتان، وزر الحذف ثابت عند الحافة
    ===================================================================== */
 #tableHead th, #tableBody td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#tableBody td.cell-title { position: sticky; right: 44px; z-index: 2; background: #fff; min-width: 140px; }
-#tableHead th.cell-title { position: sticky; right: 44px; z-index: 3; background: #f4f5f1; }
+#tableBody td.cell-title { background: #fff; min-width: 140px; }
+#tableBody td.cell-pin { position: sticky; right: 44px; z-index: 2; }
+#tableHead th.cell-title { background: #f4f5f1; }
+#tableHead th.cell-pin { position: sticky; right: 44px; z-index: 3; }
 #tableBody tr:hover td.cell-title { background: #f9f8f4; }
 #tableBody tr.row-locked td.cell-title { background: #f2f0ea; }
 #tableBody tr.bg-clay\/10 td.cell-title { background: #f6eee9; }
-#tableBody td.cell-title,
-#tableHead th.cell-title { box-shadow: -6px 0 6px -6px rgba(26, 33, 30, 0.2); }
+#tableBody td.cell-pin,
+#tableHead th.cell-pin { box-shadow: -6px 0 6px -6px rgba(26, 33, 30, 0.2); }
 
 /* خطوط أفقية هادئة + تظليل خفيف للصفوف الزوجية */
 #tableBody tr:nth-child(even) { background-color: rgba(244, 245, 241, 0.55); }
@@ -1355,3 +1357,170 @@ html[data-theme="dark"] .fab-toggle { background: linear-gradient(145deg, #2c403
 /* التذييل */
 html[data-theme="dark"] footer { color: rgba(230, 235, 232, 0.4); }
 #drawerDelete { flex-shrink: 0; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* =====================================================================
+   عرض النصوص والأرقام كاملة (بدون اقتطاع بـ …): الأعمدة تتمدد حسب المحتوى
+   ===================================================================== */
+table.table-fixed { table-layout: auto; }
+#tableHead th,
+#tableBody td { white-space: nowrap; overflow: visible; text-overflow: clip; }
+#tableBody td.cell-wrap { white-space: normal; min-width: 170px; overflow-wrap: anywhere; line-height: 1.45; }
+#tableHead th.cell-title,
+#tableBody td.cell-title { white-space: normal; }
+
+
+/* =====================================================================
+   تلميح الحالة (JS) + إشعار بزر تراجع + سجل النشاط + تباين عالٍ
+   ===================================================================== */
+/* نُلغي تلميح ::after القديم (كان يُقصّ داخل حاوية الجدول) */
+.status-badge::after,
+.lock-icon-cell::after { display: none !important; }
+#statusTip {
+  position: fixed;
+  z-index: 120;
+  pointer-events: none;
+  background: #1f2e2a;
+  color: #f4f5f1;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-shadow: var(--sh-2);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+#statusTip.show { opacity: 1; }
+html[data-theme="dark"] #statusTip { background: #e6ebe8; color: #0c1311; }
+
+.toast { display: flex; align-items: center; gap: 14px; }
+.toast-action {
+  flex-shrink: 0;
+  color: #ffd9bd;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 4px 10px;
+  margin: -4px -6px -4px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  min-height: 32px;
+}
+.toast-action:active { background: rgba(255, 255, 255, 0.15); }
+
+.activity-card { max-width: 440px; max-height: 80vh; display: flex; flex-direction: column; text-align: right; padding: 18px 16px 8px; }
+.activity-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.activity-list { overflow-y: auto; margin: 0 -4px; padding: 0 4px 8px; list-style: none; }
+.activity-item { display: flex; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--c-line); }
+.activity-item:first-child { border-top: 0; }
+.activity-dot { width: 10px; height: 10px; border-radius: 9999px; margin-top: 6px; flex-shrink: 0; background: #8a948f; }
+.activity-item--deliver .activity-dot { background: var(--c-ok); }
+.activity-item--delete .activity-dot { background: var(--c-warn); }
+.activity-item--restore .activity-dot,
+.activity-item--undo .activity-dot { background: var(--c-clay); }
+.activity-item--appendix .activity-dot { background: #6b7cc4; }
+.activity-title { font-size: 14px; color: var(--c-ink); }
+.activity-title b { font-weight: 700; }
+.activity-meta { font-size: 12px; color: rgba(26, 33, 30, 0.55); margin-top: 2px; }
+.activity-empty { text-align: center; padding: 28px 0; color: rgba(26, 33, 30, 0.5); font-size: 14px; }
+html[data-theme="dark"] .activity-title { color: var(--d-text); }
+html[data-theme="dark"] .activity-meta,
+html[data-theme="dark"] .activity-empty { color: rgba(230, 235, 232, 0.55); }
+html[data-theme="dark"] .activity-item { border-top-color: var(--d-line); }
+
+/* تباين أعلى لمن يفعّله في نظامه */
+@media (prefers-contrast: more) {
+  :root { --c-line: #8a897f; }
+  .border-line { border-color: #8a897f !important; }
+  #tableBody td.cell-field, .text-ink\/50, .text-ink\/55, .text-ink\/60 { color: #1a211e !important; }
+  html[data-theme="dark"] #tableBody td.cell-field,
+  html[data-theme="dark"] .text-ink\/50,
+  html[data-theme="dark"] .text-ink\/55,
+  html[data-theme="dark"] .text-ink\/60 { color: #ffffff !important; }
+}
+
+
+/* =====================================================================
+   زر القائمة (☰) داخل صف البحث + قائمة منسدلة تحته
+   ===================================================================== */
+.fab-dock {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  display: block;
+  direction: rtl;
+  flex-shrink: 0;
+  z-index: 40;
+}
+.fab-dock .fab-toggle,
+.fab-dock.is-open .fab-toggle,
+.fab-dock .fab-toggle:hover {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  opacity: 1;
+  background: #fff;
+  color: var(--c-pine);
+  border: 1px solid var(--c-line);
+  box-shadow: var(--sh-1);
+}
+.fab-dock.is-open .fab-toggle { background: var(--c-pine); color: #fff; border-color: var(--c-pine); }
+.fab-dock .fab-toggle svg { width: 18px; height: 18px; }
+
+.fab-dock .fab-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: auto;
+  margin: 0;
+  min-width: 230px;
+  padding: 6px;
+  gap: 2px;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-3);
+  transform-origin: top left;
+  transform: translateY(-6px) scale(0.97);
+}
+.fab-dock.is-open .fab-menu { transform: none; }
+.fab-dock .fab-item {
+  width: 100%;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  transition-delay: 0ms !important;
+}
+.fab-dock .fab-item:hover,
+.fab-dock .fab-item:focus-visible { background: var(--c-paper); }
+.fab-dock .fab-label {
+  flex: 1;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  text-align: right;
+  font-size: 14px;
+}
+.fab-dock .fab-icon,
+.fab-dock .fab-item--primary .fab-icon {
+  width: 34px;
+  height: 34px;
+  box-shadow: none;
+  border: 0;
+  background: var(--c-paper);
+  color: var(--c-pine);
+}
+.fab-dock .fab-item--primary .fab-icon { background: var(--c-pine); color: #fff; }
+
+html[data-theme="dark"] .fab-dock .fab-toggle,
+html[data-theme="dark"] .fab-dock .fab-toggle:hover { background: var(--d-surface); color: #a9d8c4; border-color: var(--d-line); }
+html[data-theme="dark"] .fab-dock.is-open .fab-toggle { background: #2f855a; color: #fff; border-color: #2f855a; }
+html[data-theme="dark"] .fab-dock .fab-menu { background: var(--d-surface); border-color: var(--d-line); }
+html[data-theme="dark"] .fab-dock .fab-item:hover,
+html[data-theme="dark"] .fab-dock .fab-item:focus-visible { background: var(--d-surface-2); }
+html[data-theme="dark"] .fab-dock .fab-icon { background: var(--d-surface-2); color: #a9d8c4; }
+html[data-theme="dark"] .fab-dock .fab-item--primary .fab-icon { background: #2f855a; color: #fff; }
+.fab-dock .fab-item { min-height: 48px; align-items: center; }

@@ -187,6 +187,7 @@ function clearAllData() {
     tx.objectStore(STORE_RECORDS).clear();
     tx.objectStore(STORE_META).clear();
     tombstones.clear();
+    activityLog = [];
     tx.oncomplete = () => resolve();
     tx.onerror = (event) => reject(event.target.error);
   });
@@ -627,19 +628,37 @@ window.renameThisDevice = renameThisDevice;
  * عرض إشعار منبثق (Toast) قصير في أسفل الشاشة، يختفي تلقائياً. يُستخدم
  * لتنبيهات المزامنة والأجهزة (انضمام/فصل جهاز، محاولة تعديل سجل مقفل...).
  */
-function showToast(message, tone = "info", duration = 3500) {
+function showToast(message, tone = "info", duration = 3500, action = null) {
   const toast = document.createElement("div");
   toast.className = `toast toast--${tone}`;
-  toast.textContent = message;
+  const text = document.createElement("span");
+  text.textContent = message;
+  toast.appendChild(text);
+
+  let timer = null;
+  const dismiss = () => {
+    clearTimeout(timer);
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 250);
+  };
+
+  // زر إجراء اختياري داخل الإشعار (مثل "تراجع")
+  if (action) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "toast-action";
+    btn.textContent = action.label;
+    btn.addEventListener("click", () => {
+      dismiss();
+      action.onClick();
+    });
+    toast.appendChild(btn);
+  }
   el.toastContainer.appendChild(toast);
 
   // إضافة كلاس "show" بعد إطار واحد لتفعيل حركة الظهور الانتقالية
   requestAnimationFrame(() => toast.classList.add("show"));
-
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 250);
-  }, duration);
+  timer = setTimeout(dismiss, duration);
 }
 window.showToast = showToast; // مطلوبة من sync-bridge.js (إشعارات الاتصال والمزامنة)
 
@@ -969,6 +988,9 @@ async function addAppendixRecords(rawRows, markAsDelivered = false) {
   }
 
   if (newRecords.length > 0) {
+    logActivity("appendix", newRecords[0], {
+      label: `${newRecords.length} سجل`,
+    });
     renderApp();
     // نبثّ كل سجل جديد فوراً لبقية الأجهزة — نفس آلية بث أي تعديل عادي،
     // وستُدمَج تلقائياً عند الطرف الآخر عبر upsertBySyncId (يضيفها كسجل
@@ -1180,6 +1202,12 @@ const ROW_DELETE_ICON =
  * عمود "العنوان" في بطاقة الموبايل: أول عمود اسمه يحوي "اسم"/"name"،
  * وإلا أول عمود. (يُستخدم للتنسيق فقط ولا يؤثر على البيانات.)
  */
+/** نص طويل فيه مسافات (عنوان، ملاحظة...) → يلتف لأسطر بدل تمديد العمود. الأرقام تبقى بسطر واحد. */
+function isLongText(value) {
+  const t = String(value ?? "");
+  return t.length > 16 && /\s/.test(t);
+}
+
 function getTitleColumnIndex() {
   const idx = allColumns.findIndex((c) => /اسم|name/i.test(String(c)));
   return idx === -1 ? 0 : idx;
@@ -1192,7 +1220,7 @@ function buildTableHead() {
     allColumns
       .map(
         (col, idx) =>
-          `<th class="${idx === titleIdx ? "cell-title" : "cell-field"}">${escapeHtml(col)}</th>`
+          `<th class="${idx === titleIdx ? (idx === 0 ? "cell-title cell-pin" : "cell-title") : "cell-field"}">${escapeHtml(col)}</th>`
       )
       .join("") +
     '<th class="row-actions-cell" aria-label="حذف"></th>';
@@ -1274,6 +1302,8 @@ function renderTableRows() {
         .map((col, idx) => {
           const cls = [
             idx === titleIdx ? "cell-title" : "cell-field",
+            idx === titleIdx && idx === 0 ? "cell-pin" : "",
+            idx !== titleIdx && isLongText(record[col]) ? "cell-wrap" : "",
             editedFields.includes(col) ? "cell-edited" : "",
           ]
             .filter(Boolean)
@@ -1678,6 +1708,8 @@ function openDrawer(id) {
 }
 
 function closeDrawer() {
+  // نزيل التركيز من داخل النافذة قبل إخفائها (aria-hidden) لتفادي تحذير إتاحة الوصول
+  if (el.drawer.contains(document.activeElement)) document.activeElement.blur();
   if (openRecordId !== null) {
     const record = allRecords.find((r) => r.id === openRecordId);
     if (record) broadcastUnlockRecord(record.__syncId);
@@ -1875,7 +1907,18 @@ el.drawerSave.addEventListener("click", async () => {
 
   renderTableRows();
   closeDrawer();
-  if (statusChecked && !wasDelivered) haptic("success");
+  if (statusChecked && !wasDelivered) {
+    haptic("success");
+    logActivity("deliver", updated);
+    showToast("تم تسجيل التسليم", "success", 6000, {
+      label: "تراجع",
+      onClick: () => undoRecordChange(record),
+    });
+  } else if (!statusChecked && wasDelivered) {
+    logActivity("undeliver", updated);
+  } else if (editedFields.size > (record.__editedFields || []).length) {
+    logActivity("edit", updated);
+  }
 
   // بثّ هذا التحديث فوراً لبقية الأجهزة المتصلة (إن وُجد اتصال بالخادم)
   broadcastRecordUpdate(updated);
@@ -1979,8 +2022,12 @@ document
       const tomb = await deleteRecordLocally(record, Date.now());
       renderApp();
       broadcastRecordUpdate(tomb);
+      logActivity("delete", record);
       haptic("warning");
-      showToast("تم حذف السجل", "success", 2500);
+      showToast("تم حذف السجل", "success", 7000, {
+        label: "تراجع",
+        onClick: () => undoDelete(record),
+      });
     } catch (error) {
       console.error(error);
       showToast("تعذّر حذف السجل", "error", 3500);
@@ -1988,6 +2035,164 @@ document
       btn.disabled = false;
     }
   });
+
+/* -------------------------------------------------------------------------
+                  8c) سجل النشاط + التراجع + حجم الخط + تلميح الحالة
+                  ------------------------------------------------------------------------- */
+
+const ACTIVITY_LABELS = {
+  deliver: "تم التسليم",
+  undeliver: "إلغاء التسليم",
+  undo: "تراجع عن التسليم",
+  delete: "حذف سجل",
+  restore: "استعادة سجل محذوف",
+  edit: "تعديل بيانات",
+  appendix: "إضافة ملحق",
+};
+let activityLog = [];
+
+function recordLabel(record) {
+  const titleCol = allColumns[getTitleColumnIndex()];
+  const v = String(record?.[titleCol] ?? "").trim();
+  return v || String(record?.[allColumns[0]] ?? "").trim() || "—";
+}
+
+/** يسجّل عملية بالسجل (الأحدث أولاً، بحد أقصى 500) ويحفظه محلياً. */
+function logActivity(type, record, { by, label } = {}) {
+  activityLog.unshift({
+    t: Date.now(),
+    type,
+    by: by || deviceName || "هذا الجهاز",
+    label: label ?? recordLabel(record),
+    syncId: record?.__syncId || null,
+  });
+  if (activityLog.length > 500) activityLog.length = 500;
+  setMeta("activityLog", activityLog).catch(() => {});
+}
+
+/** استعادة سجل محذوف (تراجع فوري). */
+async function undoDelete(record) {
+  if (allRecords.some((r) => r.__syncId === record.__syncId)) return;
+  const revived = { ...record, __updatedAt: Date.now() };
+  await updateRecord(revived); // نفس المفتاح المحلي: يستبدل شاهد الحذف
+  allRecords.push(revived);
+  allRecords.sort((x, y) => x.id - y.id); // يعود السجل لمكانه الأصلي بالجدول
+  tombstones.delete(revived.__syncId);
+  renderApp();
+  broadcastRecordUpdate(revived);
+  logActivity("restore", revived);
+  showToast("تمت استعادة السجل", "success", 2200);
+}
+
+/** إرجاع سجل لحالته السابقة (تراجع عن تسليم). */
+async function undoRecordChange(prev) {
+  const idx = allRecords.findIndex((r) => r.id === prev.id);
+  if (idx === -1) return;
+  const restored = { ...prev, __updatedAt: Date.now() };
+  await updateRecord(restored);
+  allRecords[idx] = restored;
+  renderTableRows();
+  broadcastRecordUpdate(restored);
+  logActivity("undo", restored);
+  showToast("تم التراجع عن التسليم", "info", 2200);
+}
+
+/* ---- نافذة سجل النشاط ---- */
+const activityModalEl = document.getElementById("activityModal");
+const activityOverlayEl = document.getElementById("activityModalOverlay");
+function renderActivityList() {
+  const list = document.getElementById("activityList");
+  if (activityLog.length === 0) {
+    list.innerHTML = '<li class="activity-empty">لا توجد عمليات مسجّلة بعد.</li>';
+    return;
+  }
+  list.innerHTML = activityLog
+    .map(
+      (e) => `<li class="activity-item activity-item--${escapeAttr(e.type)}">
+        <span class="activity-dot"></span>
+        <div class="activity-body">
+          <div class="activity-title">${escapeHtml(ACTIVITY_LABELS[e.type] || e.type)} <b>${escapeHtml(e.label)}</b></div>
+          <div class="activity-meta">${escapeHtml(formatDeliveryTimestamp(e.t))} · ${escapeHtml(e.by)}</div>
+        </div>
+      </li>`
+    )
+    .join("");
+}
+function openActivityModal() {
+  renderActivityList();
+  activityModalEl.classList.add("open");
+  activityModalEl.setAttribute("aria-hidden", "false");
+  activityOverlayEl.classList.add("open");
+}
+function closeActivityModal() {
+  activityModalEl.classList.remove("open");
+  activityModalEl.setAttribute("aria-hidden", "true");
+  activityOverlayEl.classList.remove("open");
+}
+document.getElementById("activityBtn")?.addEventListener("click", openActivityModal);
+document.getElementById("activityClose")?.addEventListener("click", closeActivityModal);
+activityOverlayEl?.addEventListener("click", closeActivityModal);
+activityModalEl?.addEventListener("click", (e) => {
+  if (e.target === activityModalEl) closeActivityModal();
+});
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "Escape" && activityModalEl.classList.contains("open")) {
+      e.stopImmediatePropagation();
+      closeActivityModal();
+    }
+  },
+  true
+);
+
+/* ---- حجم الخط (إتاحة وصول): 3 مستويات تُحفظ على الجهاز ---- */
+const FONT_LEVELS = [
+  { zoom: 1, label: "عادي" },
+  { zoom: 1.12, label: "كبير" },
+  { zoom: 1.25, label: "كبير جداً" },
+];
+function applyFontLevel(i) {
+  document.documentElement.style.zoom = String(FONT_LEVELS[i].zoom);
+}
+document.getElementById("fontSizeBtn")?.addEventListener("click", () => {
+  let i = 0;
+  try {
+    i = Number(localStorage.getItem("tam-font-level")) || 0;
+  } catch (_) {}
+  i = (i + 1) % FONT_LEVELS.length;
+  applyFontLevel(i);
+  try {
+    localStorage.setItem("tam-font-level", String(i));
+  } catch (_) {}
+  showToast(`حجم الخط: ${FONT_LEVELS[i].label}`, "info", 1800);
+});
+
+/* ---- تلميح خانة الحالة: عنصر واحد ثابت (fixed) لا يقصّه تمرير الجدول ---- */
+(function setupStatusTip() {
+  if (!window.matchMedia("(hover: hover)").matches) return;
+  const tip = document.createElement("div");
+  tip.id = "statusTip";
+  document.body.appendChild(tip);
+  const hide = () => tip.classList.remove("show");
+  document.addEventListener("mouseover", (e) => {
+    const t = e.target.closest?.("[data-tip]");
+    if (!t || !t.matches(".status-badge, .lock-icon-cell")) return hide();
+    tip.textContent = t.dataset.tip;
+    tip.classList.add("show");
+    const r = t.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    const below = r.bottom + 8 + h < window.innerHeight;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${below ? r.bottom + 8 : r.top - h - 8}px`;
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest?.("[data-tip]")) hide();
+  });
+  window.addEventListener("scroll", hide, true);
+})();
 
 /* -------------------------------------------------------------------------
                   9) تصدير البيانات كملف Excel محدث
@@ -2019,6 +2224,20 @@ el.exportBtn.addEventListener("click", () => {
   // ورقة "تقرير الجلسة" تُضاف تلقائياً كجزء من نفس ملف التصدير النهائي —
   // بلا حاجة لتصدير منفصل، فالمكتب يستلم كل شيء بملف واحد.
   appendSessionReportSheets(workbook);
+
+  if (activityLog.length > 0) {
+    const logRows = activityLog.map((e) => ({
+      الوقت: formatDeliveryTimestamp(e.t),
+      العملية: ACTIVITY_LABELS[e.type] || e.type,
+      السجل: e.label,
+      الجهاز: e.by,
+    }));
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(logRows),
+      "سجل النشاط"
+    );
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(workbook, `تسليم_محدث_${today}.xlsx`);
@@ -2697,6 +2916,7 @@ async function upsertBySyncId(remoteRecord) {
       showToast("تم حذف هذا السجل من جهاز آخر", "info", 3000);
     }
     await deleteRecordLocally(local, remoteRecord.__updatedAt);
+    logActivity("delete", local, { by: "جهاز آخر" });
     return true;
   }
 
@@ -2707,6 +2927,7 @@ async function upsertBySyncId(remoteRecord) {
     const revived = { ...rest, id: tomb.id };
     await updateRecord(revived);
     allRecords.push(revived);
+    allRecords.sort((x, y) => x.id - y.id);
     tombstones.delete(revived.__syncId);
     return true;
   }
@@ -2722,6 +2943,11 @@ async function upsertBySyncId(remoteRecord) {
   const local = allRecords[localIndex];
   if ((remoteRecord.__updatedAt || 0) > (local.__updatedAt || 0)) {
     const merged = { ...local, ...remoteRecord, id: local.id }; // الإبقاء على المعرّف المحلي
+    if (Boolean(local.__status) !== Boolean(merged.__status)) {
+      logActivity(merged.__status ? "deliver" : "undeliver", merged, {
+        by: merged.__deliveredByName || "جهاز آخر",
+      });
+    }
     await updateRecord(merged);
     allRecords[localIndex] = merged;
     return true;
@@ -3071,6 +3297,7 @@ function setupBackButtonGuard() {
     allColumns = (await getMeta("columns")) || [];
     allRecords = await getAllRecords();
     identifierColumnCache = (await getMeta("identifierColumn")) || null;
+    activityLog = (await getMeta("activityLog")) || [];
     renderApp();
 
     await ensureDeviceIdentity();

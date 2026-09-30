@@ -22,6 +22,10 @@
           t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         }
         document.documentElement.setAttribute("data-theme", t);
+        try {
+          var fl = [1, 1.12, 1.25][Number(localStorage.getItem("tam-font-level")) || 0];
+          if (fl) document.documentElement.style.zoom = String(fl);
+        } catch (e) {}
       })();
     </script>
 
@@ -830,6 +834,35 @@
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
+
+          <!-- قائمة الإجراءات (تصدير / تقرير / سجل النشاط / حجم الخط / ملحق) -->
+          <div id="fabDock" class="fab-dock">
+          <div id="fabMenu" class="fab-menu" role="menu" aria-hidden="true">
+            <button id="exportBtn" class="fab-item fab-item--primary" role="menuitem">
+              <span class="fab-label">تصدير كملف Excel</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg></span>
+            </button>
+            <button id="reportBtn" class="fab-item" role="menuitem" title="تقرير ختام الجلسة">
+              <span class="fab-label">تقرير الجلسة</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17V9M13 17v-5M17 17v-8M4 21h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1Z"/></svg></span>
+            </button>
+            <button id="activityBtn" class="fab-item" role="menuitem">
+              <span class="fab-label">سجل النشاط</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></span>
+            </button>
+            <button id="fontSizeBtn" class="fab-item" role="menuitem">
+              <span class="fab-label">حجم الخط</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 5l6 15M6.5 14h7M17 20l3-8 2 8"/></svg></span>
+            </button>
+            <button id="appendixBtn" class="fab-item" role="menuitem">
+              <span class="fab-label">إضافة ملحق</span>
+              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
+            </button>
+          </div>
+          <button id="fabToggle" class="fab-toggle" aria-label="الإجراءات" aria-expanded="false" aria-controls="fabMenu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
         </div>
 
         <!-- تصفية حسب حالة الاستلام -->
@@ -955,26 +988,6 @@
           </div>
         </div>
 
-        <!-- أزرار الإجراءات: زر جانبي عائم يفتح قائمة (إضافة ملحق / تقرير / تصدير) -->
-        <div id="fabDock" class="fab-dock">
-          <div id="fabMenu" class="fab-menu" role="menu" aria-hidden="true">
-            <button id="exportBtn" class="fab-item fab-item--primary" role="menuitem">
-              <span class="fab-label">تصدير كملف Excel</span>
-              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg></span>
-            </button>
-            <button id="reportBtn" class="fab-item" role="menuitem" title="تقرير ختام الجلسة">
-              <span class="fab-label">تقرير الجلسة</span>
-              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17V9M13 17v-5M17 17v-8M4 21h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1Z"/></svg></span>
-            </button>
-            <button id="appendixBtn" class="fab-item" role="menuitem">
-              <span class="fab-label">إضافة ملحق</span>
-              <span class="fab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
-            </button>
-          </div>
-          <button id="fabToggle" class="fab-toggle" aria-label="الإجراءات" aria-expanded="false" aria-controls="fabMenu">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-          </button>
-        </div>
       </section>
     </main>
 
@@ -1131,6 +1144,18 @@
           <button id="deleteCancelBtn" type="button" class="delete-modal__btn delete-modal__btn--cancel">إلغاء</button>
           <button id="deleteConfirmBtn" type="button" class="delete-modal__btn delete-modal__btn--danger">نعم، احذف</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ===================== نافذة سجل النشاط ===================== -->
+    <div id="activityModalOverlay" class="drawer-overlay delete-overlay"></div>
+    <div id="activityModal" class="delete-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="activityTitle">
+      <div class="delete-modal__card activity-card">
+        <div class="activity-head">
+          <h3 id="activityTitle" class="delete-modal__title">سجل النشاط</h3>
+          <button id="activityClose" type="button" class="session-modal-close" aria-label="إغلاق">✕</button>
+        </div>
+        <ul id="activityList" class="activity-list"></ul>
       </div>
     </div>
 
