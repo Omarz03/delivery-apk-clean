@@ -1098,103 +1098,6 @@ header.bg-pine {
 }
 
 /* =====================================================================
-   بطاقات الموبايل: كل صف يتحوّل إلى بطاقة (عنوان + حقول بتسمياتها)
-   ===================================================================== */
-@media (max-width: 640px) {
-  table { min-width: 0 !important; display: block; }
-  #tableHead { display: none; }
-  #tableBody {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 10px;
-  }
-  #tableBody tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    background: #fff;
-    border: 1px solid var(--c-line);
-    border-radius: var(--r-md);
-    padding: 12px 12px 12px 6px;
-    box-shadow: var(--sh-1);
-    position: relative;
-    transition: box-shadow 160ms, transform 160ms var(--ease);
-  }
-  #tableBody tr:active { transform: scale(0.985); box-shadow: var(--sh-2); }
-  #tableBody tr:hover { background: #fff; }
-  #tableBody tr.bg-clay\/10 { background: #fff7f1; border-color: rgba(181, 86, 31, 0.35); }
-  #tableBody tr.row-locked { background: #f2f0ea; }
-
-  #tableBody tr > td {
-    position: static;
-    display: block;
-    width: auto;
-    min-width: 0;
-    max-width: none;
-    padding: 0;
-    background: transparent !important;
-    box-shadow: none;
-    text-align: right;
-    border: 0;
-  }
-  #tableBody tr > td.cell-status { order: 1; padding-inline-start: 6px; }
-  #tableBody tr > td.cell-title {
-    order: 2;
-    flex: 1 1 0;
-    padding-inline: 10px;
-    font-size: 16px;
-    line-height: 1.35;
-    overflow-wrap: anywhere;
-  }
-  #tableBody tr > td.row-actions-cell { order: 3; }
-  #tableBody tr > td.cell-field {
-    order: 4;
-    flex: 0 0 50%;
-    box-sizing: border-box;
-    margin-top: 10px;
-    padding-inline: 10px 6px;
-    font-size: 13.5px;
-    overflow-wrap: anywhere;
-  }
-  #tableBody tr > td.cell-field::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    color: rgba(26, 33, 30, 0.45);
-    margin-bottom: 1px;
-  }
-  #tableBody tr > td.cell-edited { color: var(--c-clay); }
-  /* حاوية الجدول لا تحتاج تمريراً أفقياً بعد الآن */
-  #tableBody, table { overflow-x: hidden; }
-  .status-badge { width: 32px; height: 32px; border-radius: 10px; }
-}
-
-/* ---- تصحيحات بطاقات الموبايل ---- */
-@media (max-width: 640px) {
-  #tableBody tr > td.cell-title {
-    flex: 1 1 calc(100% - 110px);
-    min-width: 0;
-  }
-  #tableBody tr > td.row-actions-cell {
-    box-shadow: none;
-    width: 44px;
-    min-width: 44px;
-    max-width: 44px;
-  }
-  /* الحاوية: بدون تمرير داخلي أو إطار — البطاقات تتمرر مع الصفحة */
-  div:has(> .overflow-auto > table) { background: transparent !important; border: 0 !important; border-radius: 0 !important; }
-  .overflow-auto:has(> table) { max-height: none !important; overflow: visible !important; }
-  /* شريط التصفية: صف واحد قابل للتمرير، العدّاد داخل كل زر يكفي */
-  #statusFilterBar > div:first-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; }
-  #statusFilterBar > div:first-child::-webkit-scrollbar { display: none; }
-  .status-filter-btn { white-space: nowrap; flex-shrink: 0; }
-  #statusFilterCount { display: none; }
-}
-
-/* =====================================================================
    زر الإجراءات: لسان جانبي ملتصق بحافة الشاشة (بدل دائرة تغطي الجدول)
    ===================================================================== */
 .fab-dock {
@@ -1225,3 +1128,36 @@ header.bg-pine {
 .fab-menu { align-items: flex-end; }
 .fab-label { direction: rtl; }
 .fab-item { flex-direction: row; }
+
+
+/* =====================================================================
+   جدول عملي واحترافي على الموبايل: صفوف مضغوطة، تمرير أفقي سلس،
+   عمودا الحالة والاسم مثبّتان، وزر الحذف ثابت عند الحافة
+   ===================================================================== */
+#tableHead th, #tableBody td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tableBody td.cell-title { position: sticky; right: 44px; z-index: 2; background: #fff; min-width: 140px; }
+#tableHead th.cell-title { position: sticky; right: 44px; z-index: 3; background: #f4f5f1; }
+#tableBody tr:hover td.cell-title { background: #f9f8f4; }
+#tableBody tr.row-locked td.cell-title { background: #f2f0ea; }
+#tableBody tr.bg-clay\/10 td.cell-title { background: #f6eee9; }
+#tableBody td.cell-title,
+#tableHead th.cell-title { box-shadow: -6px 0 6px -6px rgba(26, 33, 30, 0.2); }
+
+/* خطوط أفقية هادئة + تظليل خفيف للصفوف الزوجية */
+#tableBody tr:nth-child(even) { background-color: rgba(244, 245, 241, 0.55); }
+#tableBody tr:nth-child(even) td:first-child,
+#tableBody tr:nth-child(even) td.cell-title,
+#tableBody tr:nth-child(even) td.row-actions-cell { background: #fafaf7; }
+
+@media (max-width: 640px) {
+  table { min-width: 640px; }
+  #tableHead th { padding: 10px 12px; font-size: 11px; }
+  #tableBody td { padding: 12px; font-size: 13.5px; }
+  #tableBody td.cell-status { padding-inline: 4px; }
+  .overflow-auto:has(> table) { max-height: 68vh; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  /* شريط التصفية: صف واحد قابل للتمرير */
+  #statusFilterBar > div:first-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; }
+  #statusFilterBar > div:first-child::-webkit-scrollbar { display: none; }
+  .status-filter-btn { white-space: nowrap; flex-shrink: 0; }
+  #statusFilterCount { display: none; }
+}

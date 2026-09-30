@@ -1186,10 +1186,16 @@ function getTitleColumnIndex() {
 }
 
 function buildTableHead() {
+  const titleIdx = getTitleColumnIndex();
   const headerCells =
-    ["الحالة", ...allColumns]
-      .map((col) => `<th>${escapeHtml(col)}</th>`)
-      .join("") + '<th class="row-actions-cell" aria-label="حذف"></th>';
+    `<th class="cell-status">الحالة</th>` +
+    allColumns
+      .map(
+        (col, idx) =>
+          `<th class="${idx === titleIdx ? "cell-title" : "cell-field"}">${escapeHtml(col)}</th>`
+      )
+      .join("") +
+    '<th class="row-actions-cell" aria-label="حذف"></th>';
   el.tableHead.innerHTML = `<tr>${headerCells}</tr>`;
 }
 
