@@ -126,9 +126,7 @@ table {
      أو مقفول. النص الكامل لاسم الجهاز يظهر فقط في tooltip (لابتوب) أو toast
      (موبايل) ولا يُكتب داخل الخلية أبداً → صفر layout shift. */
 #tableHead th:first-child,
-#tableHead th:nth-child(2),
-#tableBody td:first-child,
-#tableBody td:nth-child(2) {
+#tableBody td:first-child {
   width: 44px;
   min-width: 44px;
   max-width: 44px;
@@ -806,31 +804,18 @@ main { padding-bottom: 88px; }
 /* -------------------- الجدول: تثبيت أول عمودين (الحالة + أول عمود بيانات) أثناء السحب الأفقي --------------------
    الصفحة RTL فالعمودان عند الطرف الأيمن؛ عرض كل منهما 44px (انظر أعلاه). */
 #tableHead th:first-child,
-#tableBody td:first-child,
-#tableHead th:nth-child(2),
-#tableBody td:nth-child(2) {
+#tableBody td:first-child {
   position: sticky;
   z-index: 2;
 }
 #tableHead th:first-child,
 #tableBody td:first-child { right: 0; }
-#tableHead th:nth-child(2),
-#tableBody td:nth-child(2) {
-  right: 44px;
-  box-shadow: -6px 0 6px -6px rgba(26, 33, 30, 0.18);
-}
-#tableHead th:first-child,
-#tableHead th:nth-child(2) { z-index: 3; background: #f4f5f1; }
-#tableBody td:first-child,
-#tableBody td:nth-child(2) { background: #fff; }
-#tableBody tr:hover td:first-child,
-#tableBody tr:hover td:nth-child(2) { background: #f9f8f4; }
+#tableHead th:first-child { z-index: 3; background: #f4f5f1; }
+#tableBody td:first-child { background: #fff; }
+#tableBody tr:hover td:first-child { background: #f9f8f4; }
 #tableBody tr.row-locked td:first-child,
-#tableBody tr.row-locked td:nth-child(2),
-#tableBody tr.row-locked:hover td:first-child,
-#tableBody tr.row-locked:hover td:nth-child(2) { background: #f2f0ea; }
-#tableBody tr.bg-clay\/10 td:first-child,
-#tableBody tr.bg-clay\/10 td:nth-child(2) { background: #f6eee9; }
+#tableBody tr.row-locked:hover td:first-child { background: #f2f0ea; }
+#tableBody tr.bg-clay\/10 td:first-child { background: #f6eee9; }
 
 /* -------------------- أهداف اللمس: 40-44px على الشاشات التي تعمل باللمس -------------------- */
 @media (pointer: coarse) {
@@ -955,3 +940,288 @@ main { padding-bottom: 88px; }
 .row-delete-btn:hover,
 .row-delete-btn:focus-visible { color: #9c4221; background: rgba(156, 66, 33, 0.1); }
 .row-delete-btn:active { background: rgba(156, 66, 33, 0.2); }
+
+
+/* =====================================================================
+   طبقة التصميم (Design Layer) — رموز، ظلال، حركة، بطاقات الموبايل
+   ===================================================================== */
+:root {
+  --c-pine: #1f2e2a;
+  --c-pine-2: #2c4038;
+  --c-clay: #b5561f;
+  --c-clay-2: #d9824c;
+  --c-paper: #f4f5f1;
+  --c-ink: #1a211e;
+  --c-line: #dad9d0;
+  --c-ok: #2f855a;
+  --c-warn: #9c4221;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --sh-1: 0 1px 2px rgba(26, 33, 30, 0.06), 0 1px 1px rgba(26, 33, 30, 0.04);
+  --sh-2: 0 4px 14px rgba(26, 33, 30, 0.08), 0 1px 3px rgba(26, 33, 30, 0.06);
+  --sh-3: 0 14px 34px rgba(26, 33, 30, 0.16);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body {
+  background:
+    radial-gradient(900px 380px at 100% -80px, rgba(181, 86, 31, 0.07), transparent 70%),
+    linear-gradient(#eef0ea, var(--c-paper) 320px);
+  background-attachment: fixed;
+}
+
+/* ---------- الهيدر: تدرّج + نقشة نقطية خفيفة (تلميح لختم الاستلام) ---------- */
+header.bg-pine {
+  background:
+    radial-gradient(rgba(244, 245, 241, 0.06) 1px, transparent 1.4px) 0 0 / 14px 14px,
+    linear-gradient(135deg, #1a2723 0%, var(--c-pine) 45%, var(--c-pine-2) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.stamp-mark {
+  background: rgba(244, 245, 241, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(244, 245, 241, 0.08);
+  animation: stamp-in 700ms var(--ease) both;
+}
+@keyframes stamp-in {
+  from { transform: rotate(-40deg) scale(0.4); opacity: 0; }
+  to   { transform: rotate(-8deg) scale(1); opacity: 1; }
+}
+
+/* ---------- شريط التقدّم ---------- */
+#progressFill {
+  background: linear-gradient(90deg, #2f855a, #48b07f);
+  border-radius: 9999px;
+  position: relative;
+  overflow: hidden;
+  transition: width 700ms var(--ease);
+}
+#progressFill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(120%);
+  animation: sheen 3.2s ease-in-out infinite;
+}
+@keyframes sheen { to { transform: translateX(-120%); } }
+#counterBar { backdrop-filter: saturate(1.4) blur(6px); }
+
+/* ---------- البحث ---------- */
+#searchInput {
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-1);
+  transition: box-shadow 160ms, border-color 160ms;
+}
+#searchInput:focus { box-shadow: 0 0 0 4px rgba(181, 86, 31, 0.14); }
+
+/* ---------- شريط التصفية (Segmented control + عدّادات) ---------- */
+#statusFilterBar {
+  background: #ecede7;
+  border: 0;
+  border-radius: var(--r-md);
+  padding: 4px;
+  box-shadow: inset 0 1px 2px rgba(26, 33, 30, 0.06);
+}
+.status-filter-btn {
+  border-radius: var(--r-sm) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 200ms var(--ease), color 200ms, box-shadow 200ms;
+}
+.status-filter-btn.bg-pine {
+  background: var(--c-pine);
+  box-shadow: 0 2px 8px rgba(31, 46, 42, 0.35);
+}
+.seg-count {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(26, 33, 30, 0.08);
+  text-align: center;
+}
+.status-filter-btn.bg-pine .seg-count { background: rgba(255, 255, 255, 0.2); }
+
+/* ---------- الجدول (سطح المكتب) ---------- */
+#tableHead th {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--c-line);
+}
+#tableBody tr:first-child { border-top: 0; }
+#tableBody td.cell-title { font-weight: 700; color: var(--c-pine); }
+#tableBody td.cell-field { color: rgba(26, 33, 30, 0.78); }
+.status-badge { transition: transform 160ms var(--ease); }
+#tableBody tr:hover .status-badge { transform: scale(1.08); }
+.status-badge--delivered {
+  box-shadow: inset 0 0 0 1px rgba(47, 133, 90, 0.25);
+}
+
+/* دخول الصفوف بحركة متتابعة خفيفة */
+#tableBody tr { animation: row-in 380ms var(--ease) both; }
+#tableBody tr:nth-child(2) { animation-delay: 30ms; }
+#tableBody tr:nth-child(3) { animation-delay: 60ms; }
+#tableBody tr:nth-child(4) { animation-delay: 90ms; }
+#tableBody tr:nth-child(5) { animation-delay: 120ms; }
+#tableBody tr:nth-child(6) { animation-delay: 150ms; }
+#tableBody tr:nth-child(n + 7) { animation-delay: 180ms; }
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- القائمة العائمة ---------- */
+.fab-toggle {
+  background: linear-gradient(145deg, var(--c-pine-2), var(--c-pine));
+  box-shadow: var(--sh-3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.fab-dock.is-open .fab-toggle { background: linear-gradient(145deg, var(--c-clay-2), var(--c-clay)); }
+.fab-dock.is-open .fab-toggle svg { transform: rotate(90deg); }
+.fab-toggle svg { transition: transform 240ms var(--ease); }
+.fab-item { transition: transform 200ms var(--ease); }
+.fab-dock.is-open .fab-item:nth-child(1) { transition-delay: 60ms; }
+.fab-dock.is-open .fab-item:nth-child(2) { transition-delay: 30ms; }
+
+/* ---------- النوافذ ---------- */
+.drawer { border-radius: 0 var(--r-lg) var(--r-lg) 0; box-shadow: var(--sh-3); }
+.drawer-overlay { backdrop-filter: blur(2px); }
+.toast { box-shadow: var(--sh-3); border-radius: var(--r-md); }
+
+/* ---------- إتاحة الوصول ---------- */
+:focus-visible { outline: 3px solid rgba(181, 86, 31, 0.45); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  #tableBody tr, .stamp-mark, #progressFill::after { animation: none !important; }
+}
+
+/* =====================================================================
+   بطاقات الموبايل: كل صف يتحوّل إلى بطاقة (عنوان + حقول بتسمياتها)
+   ===================================================================== */
+@media (max-width: 640px) {
+  table { min-width: 0 !important; display: block; }
+  #tableHead { display: none; }
+  #tableBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+  }
+  #tableBody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    padding: 12px 12px 12px 6px;
+    box-shadow: var(--sh-1);
+    position: relative;
+    transition: box-shadow 160ms, transform 160ms var(--ease);
+  }
+  #tableBody tr:active { transform: scale(0.985); box-shadow: var(--sh-2); }
+  #tableBody tr:hover { background: #fff; }
+  #tableBody tr.bg-clay\/10 { background: #fff7f1; border-color: rgba(181, 86, 31, 0.35); }
+  #tableBody tr.row-locked { background: #f2f0ea; }
+
+  #tableBody tr > td {
+    position: static;
+    display: block;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    background: transparent !important;
+    box-shadow: none;
+    text-align: right;
+    border: 0;
+  }
+  #tableBody tr > td.cell-status { order: 1; padding-inline-start: 6px; }
+  #tableBody tr > td.cell-title {
+    order: 2;
+    flex: 1 1 0;
+    padding-inline: 10px;
+    font-size: 16px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  #tableBody tr > td.row-actions-cell { order: 3; }
+  #tableBody tr > td.cell-field {
+    order: 4;
+    flex: 0 0 50%;
+    box-sizing: border-box;
+    margin-top: 10px;
+    padding-inline: 10px 6px;
+    font-size: 13.5px;
+    overflow-wrap: anywhere;
+  }
+  #tableBody tr > td.cell-field::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: rgba(26, 33, 30, 0.45);
+    margin-bottom: 1px;
+  }
+  #tableBody tr > td.cell-edited { color: var(--c-clay); }
+  /* حاوية الجدول لا تحتاج تمريراً أفقياً بعد الآن */
+  #tableBody, table { overflow-x: hidden; }
+  .status-badge { width: 32px; height: 32px; border-radius: 10px; }
+}
+
+/* ---- تصحيحات بطاقات الموبايل ---- */
+@media (max-width: 640px) {
+  #tableBody tr > td.cell-title {
+    flex: 1 1 calc(100% - 110px);
+    min-width: 0;
+  }
+  #tableBody tr > td.row-actions-cell {
+    box-shadow: none;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+  }
+  /* الحاوية: بدون تمرير داخلي أو إطار — البطاقات تتمرر مع الصفحة */
+  div:has(> .overflow-auto > table) { background: transparent !important; border: 0 !important; border-radius: 0 !important; }
+  .overflow-auto:has(> table) { max-height: none !important; overflow: visible !important; }
+  /* شريط التصفية: صف واحد قابل للتمرير، العدّاد داخل كل زر يكفي */
+  #statusFilterBar > div:first-child { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; }
+  #statusFilterBar > div:first-child::-webkit-scrollbar { display: none; }
+  .status-filter-btn { white-space: nowrap; flex-shrink: 0; }
+  #statusFilterCount { display: none; }
+}
+
+/* =====================================================================
+   زر الإجراءات: لسان جانبي ملتصق بحافة الشاشة (بدل دائرة تغطي الجدول)
+   ===================================================================== */
+.fab-dock {
+  right: 0;
+  bottom: calc(22vh + env(safe-area-inset-bottom));
+  gap: 8px;
+}
+.fab-toggle {
+  width: 24px;
+  height: 64px;
+  border-radius: 14px 0 0 14px;
+  opacity: 0.82;
+  box-shadow: -3px 4px 14px rgba(26, 33, 30, 0.25);
+  transition: width 200ms var(--ease), opacity 200ms, background 150ms;
+}
+.fab-toggle svg { width: 14px; height: 14px; }
+.fab-toggle:hover,
+.fab-dock.is-open .fab-toggle { opacity: 1; width: 30px; }
+.fab-menu { margin-right: 10px; transform-origin: bottom right; }
+/* على الجوال: لا نغطي حاشية البطاقات */
+@media (max-width: 640px) {
+  .fab-toggle { width: 20px; }
+  .fab-toggle:hover, .fab-dock.is-open .fab-toggle { width: 28px; }
+}
+
+/* إصلاح: الاتجاه RTL كان يعكس محاذاة flex-end فيُزاح الزر عن الحافة */
+.fab-dock { direction: ltr; align-items: flex-end; }
+.fab-menu { align-items: flex-end; }
+.fab-label { direction: rtl; }
+.fab-item { flex-direction: row; }

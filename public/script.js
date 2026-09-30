@@ -1176,6 +1176,15 @@ function updateDeliveryCounter() {
 const ROW_DELETE_ICON =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
 
+/**
+ * عمود "العنوان" في بطاقة الموبايل: أول عمود اسمه يحوي "اسم"/"name"،
+ * وإلا أول عمود. (يُستخدم للتنسيق فقط ولا يؤثر على البيانات.)
+ */
+function getTitleColumnIndex() {
+  const idx = allColumns.findIndex((c) => /اسم|name/i.test(String(c)));
+  return idx === -1 ? 0 : idx;
+}
+
 function buildTableHead() {
   const headerCells =
     ["الحالة", ...allColumns]
@@ -1254,12 +1263,18 @@ function renderTableRows() {
         : `<span class="status-badge status-badge--pending" data-tip="لم يتم الاستلام" aria-label="لم يتم الاستلام"></span>`;
 
       const editedFields = record.__editedFields || [];
+      const titleIdx = getTitleColumnIndex();
       const dataCells = allColumns
-        .map((col) => {
-          const cellClass = editedFields.includes(col)
-            ? ' class="cell-edited"'
-            : "";
-          return `<td${cellClass}>${escapeHtml(record[col])}</td>`;
+        .map((col, idx) => {
+          const cls = [
+            idx === titleIdx ? "cell-title" : "cell-field",
+            editedFields.includes(col) ? "cell-edited" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return `<td class="${cls}" data-label="${escapeAttr(col)}">${escapeHtml(
+            record[col]
+          )}</td>`;
         })
         .join("");
 
@@ -1267,7 +1282,7 @@ function renderTableRows() {
       const appendixClass = record.__isAppendix ? " bg-clay/10" : "";
       return `<tr data-id="${
         record.id
-      }" class="${lockedClass}${appendixClass}">${`<td>${statusCell}</td>`}${dataCells}<td class="row-actions-cell"><button type="button" class="row-delete-btn" data-delete-id="${
+      }" class="${lockedClass}${appendixClass}">${`<td class="cell-status">${statusCell}</td>`}${dataCells}<td class="row-actions-cell"><button type="button" class="row-delete-btn" data-delete-id="${
         record.id
       }" aria-label="حذف السجل" title="حذف السجل">${ROW_DELETE_ICON}</button></td></tr>`;
     })
@@ -1456,10 +1471,26 @@ const statusFilterMap = {
 function updateStatusFilterBar(count) {
   const hasAppendix = allRecords.some((r) => r.__isAppendix === true);
 
+  // عدّاد حيّ داخل كل زر تصفية (الكل / تم / لم يتم / ملحق)
+  const counts = {
+    all: allRecords.length,
+    delivered: allRecords.filter((r) => r.__status === true).length,
+    pending: allRecords.filter((r) => r.__status !== true).length,
+    appendix: allRecords.filter((r) => r.__isAppendix === true).length,
+  };
+  const filterLabels = {
+    all: "الكل",
+    delivered: "تم الاستلام",
+    pending: "لم يتم الاستلام",
+    appendix: "ملحق",
+  };
+  document.querySelectorAll(".status-filter-btn").forEach((btn) => {
+    const key = btn.dataset.statusFilter;
+    if (!(key in filterLabels)) return;
+    btn.innerHTML = `${filterLabels[key]}<span class="seg-count">${counts[key]}</span>`;
+  });
   if (el.appendixFilterBtn) {
-    // الزر ظاهر دائماً مع عدّاد السجلات الملحقة؛ يُخفَّف لونه لو ما فيه ملحق.
-    const appendixCount = allRecords.filter((r) => r.__isAppendix === true).length;
-    el.appendixFilterBtn.textContent = `ملحق (${appendixCount})`;
+    // الزر ظاهر دائماً؛ يُخفَّف لونه لو ما فيه ملحق.
     el.appendixFilterBtn.classList.toggle("opacity-50", !hasAppendix);
   }
 
