@@ -1436,6 +1436,24 @@ el.searchInput.addEventListener("input", (event) => {
   updateClearBtnVisibility();
 });
 
+/* ---------------- الوضع الداكن ---------------- */
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b1110" : "#1F2E2A");
+}
+applyTheme(document.documentElement.getAttribute("data-theme") || "light");
+document.getElementById("themeToggle")?.addEventListener("click", () => {
+  const next =
+    document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  applyTheme(next);
+  try {
+    localStorage.setItem("tam-theme", next);
+  } catch (_) {
+    /* التخزين غير متاح — يبقى التغيير للجلسة الحالية فقط */
+  }
+});
+
 /**
  * اهتزاز خفيف كتغذية راجعة للمس. داخل APK يستخدم Capacitor Haptics؛ على الويب
  * يستخدم navigator.vibrate (أندرويد فقط — iOS Safari لا يدعمه). لا يرمي أخطاء أبداً.

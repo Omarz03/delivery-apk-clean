@@ -1161,3 +1161,197 @@ header.bg-pine {
   .status-filter-btn { white-space: nowrap; flex-shrink: 0; }
   #statusFilterCount { display: none; }
 }
+
+
+/* =====================================================================
+   إصلاحات الجدول: الاسم كامل + إزالة الشريط الأسود تحت خانة الحالة
+   ===================================================================== */
+/* الـ tooltip الخاص بخانة الحالة كان يُقصّ بفعل overflow:hidden فيظهر كشريط أسود قصير */
+#tableBody td.cell-status,
+#tableBody td.row-actions-cell,
+#tableHead th.cell-status,
+#tableHead th.row-actions-cell { overflow: visible; text-overflow: clip; }
+/* عمود الاسم: يعرض النص كاملاً (يلتف لسطر ثانٍ عند الحاجة) */
+#tableBody td.cell-title,
+#tableHead th.cell-title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+#tableHead th.cell-title { width: 24%; min-width: 200px; }
+#tableBody td.cell-title { min-width: 200px; }
+
+/* =====================================================================
+   الوضع الداكن
+   ===================================================================== */
+.theme-icon-sun { display: none; }
+html[data-theme="dark"] .theme-icon-sun { display: block; }
+html[data-theme="dark"] .theme-icon-moon { display: none; }
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --d-bg: #0c1311;
+  --d-surface: #151f1c;
+  --d-surface-2: #1b2824;
+  --d-line: #2a3a34;
+  --d-text: #e6ebe8;
+  --d-ok: #48b07f;
+  --d-warn: #e0866a;
+  --d-clay: #d9824c;
+}
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 380px at 100% -80px, rgba(217, 130, 76, 0.08), transparent 70%),
+    linear-gradient(#0a0f0e, var(--d-bg) 320px);
+  color: var(--d-text);
+}
+
+/* ألوان Tailwind الثابتة */
+html[data-theme="dark"] .bg-white { background-color: var(--d-surface); }
+html[data-theme="dark"] .bg-paper { background-color: var(--d-bg); }
+html[data-theme="dark"] .hover\:bg-paper:hover { background-color: var(--d-surface-2); }
+html[data-theme="dark"] .text-ink { color: var(--d-text); }
+html[data-theme="dark"] .hover\:text-ink:hover { color: #fff; }
+html[data-theme="dark"] .text-ink\/30 { color: rgba(230, 235, 232, 0.3); }
+html[data-theme="dark"] .text-ink\/35 { color: rgba(230, 235, 232, 0.35); }
+html[data-theme="dark"] .text-ink\/40 { color: rgba(230, 235, 232, 0.4); }
+html[data-theme="dark"] .text-ink\/45 { color: rgba(230, 235, 232, 0.45); }
+html[data-theme="dark"] .text-ink\/50 { color: rgba(230, 235, 232, 0.5); }
+html[data-theme="dark"] .text-ink\/55 { color: rgba(230, 235, 232, 0.6); }
+html[data-theme="dark"] .text-ink\/60 { color: rgba(230, 235, 232, 0.66); }
+html[data-theme="dark"] .text-pine { color: #a9d8c4; }
+html[data-theme="dark"] .text-pending { color: var(--d-warn); }
+html[data-theme="dark"] .text-delivered { color: var(--d-ok); }
+html[data-theme="dark"] .border-line { border-color: var(--d-line); }
+html[data-theme="dark"] .bg-ink\/5 { background-color: rgba(255, 255, 255, 0.05); }
+html[data-theme="dark"] .bg-pine\/10 { background-color: rgba(169, 216, 196, 0.1); }
+html[data-theme="dark"] .bg-white\/40 { background-color: rgba(21, 31, 28, 0.6); }
+html[data-theme="dark"] .bg-clay\/10 { background-color: rgba(217, 130, 76, 0.14); }
+html[data-theme="dark"] .hover\:bg-clay\/5:hover { background-color: rgba(217, 130, 76, 0.1); }
+html[data-theme="dark"] .shadow-sm { --tw-shadow-color: transparent; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea { background-color: var(--d-surface-2); color: var(--d-text); }
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: rgba(230, 235, 232, 0.4); }
+
+/* الهيدر وشريط التقدّم */
+html[data-theme="dark"] header.bg-pine {
+  background:
+    radial-gradient(rgba(244, 245, 241, 0.05) 1px, transparent 1.4px) 0 0 / 14px 14px,
+    linear-gradient(135deg, #0b1110 0%, #111b18 55%, #182722 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+html[data-theme="dark"] #counterBar { background: rgba(21, 31, 28, 0.85); }
+html[data-theme="dark"] #counterBar .bg-ink\/5,
+html[data-theme="dark"] #counterBar [class*="bg-ink"] { background-color: rgba(255, 255, 255, 0.08); }
+
+/* شريط التصفية */
+html[data-theme="dark"] #statusFilterBar { background: #111a17; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); }
+html[data-theme="dark"] .status-filter-btn.bg-pine { background: #2f855a; color: #fff; box-shadow: 0 2px 8px rgba(47, 133, 90, 0.4); }
+html[data-theme="dark"] .seg-count { background: rgba(255, 255, 255, 0.1); }
+html[data-theme="dark"] .status-filter-btn.bg-pine .seg-count { background: rgba(255, 255, 255, 0.22); }
+
+/* الجدول */
+html[data-theme="dark"] #tableHead { background: #111a17; color: rgba(230, 235, 232, 0.6); }
+html[data-theme="dark"] #tableHead th { border-bottom-color: var(--d-line); }
+html[data-theme="dark"] #tableBody tr { border-top-color: #202e29; }
+html[data-theme="dark"] #tableBody tr:hover { background-color: #1a2723; }
+html[data-theme="dark"] #tableBody tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+html[data-theme="dark"] #tableBody td.cell-title { color: #a9d8c4; }
+html[data-theme="dark"] #tableBody td.cell-field { color: rgba(230, 235, 232, 0.8); }
+/* الأعمدة الثابتة */
+html[data-theme="dark"] #tableHead th:first-child,
+html[data-theme="dark"] #tableHead th.cell-title,
+html[data-theme="dark"] #tableHead th.row-actions-cell { background: #111a17; }
+html[data-theme="dark"] #tableBody td:first-child,
+html[data-theme="dark"] #tableBody td.cell-title,
+html[data-theme="dark"] #tableBody td.row-actions-cell { background: var(--d-surface); }
+html[data-theme="dark"] #tableBody tr:nth-child(even) td:first-child,
+html[data-theme="dark"] #tableBody tr:nth-child(even) td.cell-title,
+html[data-theme="dark"] #tableBody tr:nth-child(even) td.row-actions-cell { background: #17211e; }
+html[data-theme="dark"] #tableBody tr:hover td:first-child,
+html[data-theme="dark"] #tableBody tr:hover td.cell-title,
+html[data-theme="dark"] #tableBody tr:hover td.row-actions-cell { background: #1a2723; }
+html[data-theme="dark"] #tableBody tr.row-locked td:first-child,
+html[data-theme="dark"] #tableBody tr.row-locked td.cell-title,
+html[data-theme="dark"] #tableBody tr.row-locked td.row-actions-cell { background: #1e2723; }
+html[data-theme="dark"] #tableBody tr.bg-clay\/10 td:first-child,
+html[data-theme="dark"] #tableBody tr.bg-clay\/10 td.cell-title,
+html[data-theme="dark"] #tableBody tr.bg-clay\/10 td.row-actions-cell { background: #2a2119; }
+html[data-theme="dark"] #tableBody tr.row-locked {
+  background: repeating-linear-gradient(45deg, #17211e, #17211e 10px, #1c2723 10px, #1c2723 20px);
+}
+html[data-theme="dark"] #tableBody tr.row-locked:hover {
+  background: repeating-linear-gradient(45deg, #17211e, #17211e 10px, #1c2723 10px, #1c2723 20px);
+}
+html[data-theme="dark"] #tableBody td.cell-edited { background: rgba(217, 165, 60, 0.14); }
+html[data-theme="dark"] #tableBody tr:hover td.cell-edited { background: rgba(217, 165, 60, 0.22); }
+html[data-theme="dark"] .status-badge--delivered { background: rgba(72, 176, 127, 0.16); color: var(--d-ok); box-shadow: inset 0 0 0 1px rgba(72, 176, 127, 0.3); }
+html[data-theme="dark"] .status-badge--pending { background: rgba(224, 134, 106, 0.1); color: rgba(230, 235, 232, 0.35); }
+html[data-theme="dark"] .status-badge::after,
+html[data-theme="dark"] .lock-icon-cell::after { background: #e6ebe8; color: #0c1311; }
+html[data-theme="dark"] .row-delete-btn { color: rgba(230, 235, 232, 0.45); }
+html[data-theme="dark"] .row-delete-btn:hover,
+html[data-theme="dark"] .row-delete-btn:focus-visible { color: var(--d-warn); background: rgba(224, 134, 106, 0.14); }
+html[data-theme="dark"] .lock-icon-cell { background: rgba(224, 134, 106, 0.14); color: var(--d-warn); }
+html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #2f413a; }
+
+/* النوافذ: الجانبية، الجلسة، الحذف، التقرير */
+html[data-theme="dark"] .drawer,
+html[data-theme="dark"] .session-panel,
+html[data-theme="dark"] .session-modal-inner,
+html[data-theme="dark"] .session-modal-header,
+html[data-theme="dark"] .delete-modal__card { background: var(--d-surface); }
+html[data-theme="dark"] .drawer-overlay { background: rgba(0, 0, 0, 0.6); }
+html[data-theme="dark"] .drawer-field { border-bottom-color: #22312b; }
+html[data-theme="dark"] .drawer-field span.label { color: rgba(230, 235, 232, 0.5); }
+html[data-theme="dark"] .drawer-field span.value,
+html[data-theme="dark"] .drawer-field input.value { color: var(--d-text); }
+html[data-theme="dark"] .drawer-field input.value:hover { background: var(--d-surface-2); }
+html[data-theme="dark"] .drawer-field input.value:focus { background: var(--d-surface-2); border-color: var(--d-clay); }
+html[data-theme="dark"] .drawer-field--edited { background: rgba(217, 165, 60, 0.12); }
+html[data-theme="dark"] .drawer-field--edited .edited-tag { color: #e0b25a; }
+html[data-theme="dark"] .status-toggle { background: #34443d; }
+html[data-theme="dark"] .status-toggle[data-checked="true"] { background: #2f855a; }
+html[data-theme="dark"] .session-modal-header { border-bottom-color: var(--d-line); }
+html[data-theme="dark"] .session-modal-title { color: #a9d8c4; }
+html[data-theme="dark"] .session-modal-close { color: rgba(230, 235, 232, 0.5); }
+html[data-theme="dark"] .session-modal-close:hover { color: #fff; }
+html[data-theme="dark"] .step-label { color: rgba(230, 235, 232, 0.7); }
+html[data-theme="dark"] .step-desc { color: rgba(230, 235, 232, 0.66); }
+html[data-theme="dark"] .step-hint { color: rgba(230, 235, 232, 0.45); }
+html[data-theme="dark"] .qr-container { background: #fff; }
+html[data-theme="dark"] .qr-spinner { border-color: var(--d-line); border-top-color: #a9d8c4; }
+html[data-theme="dark"] .device-item { border-color: var(--d-line); }
+html[data-theme="dark"] .device-item .device-ip { color: rgba(230, 235, 232, 0.55); }
+html[data-theme="dark"] .device-item--self { background: rgba(217, 130, 76, 0.1); }
+html[data-theme="dark"] .btn-secondary { color: rgba(230, 235, 232, 0.75); border-color: var(--d-line); }
+html[data-theme="dark"] .btn-secondary:hover { background: var(--d-surface-2); }
+html[data-theme="dark"] .report-stat-card { background: var(--d-surface-2); }
+html[data-theme="dark"] .report-stat-card .report-stat-value { color: #a9d8c4; }
+html[data-theme="dark"] .report-stat-card .report-stat-label,
+html[data-theme="dark"] .report-breakdown-title,
+html[data-theme="dark"] .report-breakdown-table th { color: rgba(230, 235, 232, 0.6); }
+html[data-theme="dark"] .report-breakdown-table th { border-bottom-color: var(--d-line); }
+html[data-theme="dark"] .report-breakdown-table td { border-bottom-color: #22312b; }
+html[data-theme="dark"] .duplicate-warning { background: rgba(224, 134, 106, 0.1); border-color: rgba(224, 134, 106, 0.35); color: var(--d-warn); }
+html[data-theme="dark"] .delete-modal__title { color: var(--d-text); }
+html[data-theme="dark"] .delete-modal__summary { background: var(--d-surface-2); color: #a9d8c4; }
+html[data-theme="dark"] .delete-modal__text { color: rgba(230, 235, 232, 0.7); }
+html[data-theme="dark"] .delete-modal__icon { background: rgba(224, 134, 106, 0.16); color: var(--d-warn); }
+html[data-theme="dark"] .delete-modal__extra { color: var(--d-warn); }
+html[data-theme="dark"] .delete-modal__btn--cancel { background: var(--d-surface-2); color: var(--d-text); border-color: var(--d-line); }
+html[data-theme="dark"] .delete-modal__btn--danger { background: #c4553a; }
+
+/* الزر الجانبي */
+html[data-theme="dark"] .fab-label { background: var(--d-surface-2); color: var(--d-text); border-color: var(--d-line); }
+html[data-theme="dark"] .fab-icon { background: var(--d-surface-2); color: #a9d8c4; border-color: var(--d-line); }
+html[data-theme="dark"] .fab-item--primary .fab-icon { background: #2f855a; color: #fff; border-color: #2f855a; }
+html[data-theme="dark"] .fab-toggle { background: linear-gradient(145deg, #2c4038, #1f2e2a); border: 1px solid rgba(255, 255, 255, 0.08); }
+
+/* التذييل */
+html[data-theme="dark"] footer { color: rgba(230, 235, 232, 0.4); }
+#drawerDelete { flex-shrink: 0; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; }
