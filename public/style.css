@@ -1080,7 +1080,6 @@ header.bg-pine {
   box-shadow: var(--sh-3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 .fab-dock.is-open .fab-toggle { background: linear-gradient(145deg, var(--c-clay-2), var(--c-clay)); }
-.fab-dock.is-open .fab-toggle svg { transform: rotate(90deg); }
 .fab-toggle svg { transition: transform 240ms var(--ease); }
 .fab-item { transition: transform 200ms var(--ease); }
 .fab-dock.is-open .fab-item:nth-child(1) { transition-delay: 60ms; }
@@ -1449,7 +1448,8 @@ html[data-theme="dark"] .activity-item { border-top-color: var(--d-line); }
   display: block;
   direction: rtl;
   flex-shrink: 0;
-  z-index: 40;
+  /* أقل من الشريط العلوي الثابت (z-30) حتى يمر الزر تحته عند التمرير */
+  z-index: 20;
 }
 .fab-dock .fab-toggle,
 .fab-dock.is-open .fab-toggle,
@@ -1463,8 +1463,16 @@ html[data-theme="dark"] .activity-item { border-top-color: var(--d-line); }
   border: 1px solid var(--c-line);
   box-shadow: var(--sh-1);
 }
-.fab-dock.is-open .fab-toggle { background: var(--c-pine); color: #fff; border-color: var(--c-pine); }
-.fab-dock .fab-toggle svg { width: 18px; height: 18px; }
+.fab-dock .fab-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.fab-dock .fab-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: opacity 180ms var(--ease), transform 220ms var(--ease);
+}
+/* تبديل الأيقونة: ☰ ← → × بدل قلب لون الزر */
+.fab-dock .fab-toggle .fab-ico-close { position: absolute; opacity: 0; transform: rotate(-90deg) scale(0.6); }
+.fab-dock.is-open .fab-toggle .fab-ico-burger { opacity: 0; transform: rotate(90deg) scale(0.6); }
+.fab-dock.is-open .fab-toggle .fab-ico-close { opacity: 1; transform: none; }
 
 .fab-dock .fab-menu {
   position: absolute;
@@ -1517,7 +1525,6 @@ html[data-theme="dark"] .activity-item { border-top-color: var(--d-line); }
 
 html[data-theme="dark"] .fab-dock .fab-toggle,
 html[data-theme="dark"] .fab-dock .fab-toggle:hover { background: var(--d-surface); color: #a9d8c4; border-color: var(--d-line); }
-html[data-theme="dark"] .fab-dock.is-open .fab-toggle { background: #2f855a; color: #fff; border-color: #2f855a; }
 html[data-theme="dark"] .fab-dock .fab-menu { background: var(--d-surface); border-color: var(--d-line); }
 html[data-theme="dark"] .fab-dock .fab-item:hover,
 html[data-theme="dark"] .fab-dock .fab-item:focus-visible { background: var(--d-surface-2); }

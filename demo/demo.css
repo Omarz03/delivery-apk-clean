@@ -1,0 +1,139 @@
+/* demo.css — عناصر النسخة التجريبية فقط */
+
+/* ---- الشارة العائمة ---- */
+.demo-pill {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  background: var(--c-pine, #1f2e2a);
+  color: #fff;
+  border-radius: 999px;
+  box-shadow: var(--sh-3, 0 14px 34px rgba(26, 33, 30, 0.16));
+  font-size: 13px;
+  font-weight: 600;
+}
+.demo-pill button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.demo-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-clay-2, #d9824c);
+  box-shadow: 0 0 0 3px rgba(217, 130, 76, 0.25);
+}
+.demo-pill__sep { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.2); }
+.demo-pill__time { color: rgba(255, 255, 255, 0.75); font-weight: 500; }
+.demo-pill__time b { color: #fff; font-family: ui-monospace, monospace; font-weight: 700; }
+.demo-pill__reset {
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+.demo-pill__reset:hover { background: var(--c-clay, #b5561f) !important; }
+@media (max-width: 480px) {
+  .demo-pill { left: 12px; bottom: 12px; font-size: 12px; }
+}
+
+/* ---- النافذة التعريفية ---- */
+.demo-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(12, 19, 17, 0.55);
+  backdrop-filter: blur(3px);
+}
+.demo-intro.is-open { display: flex; }
+.demo-intro__card {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: #fff;
+  color: var(--c-ink, #1a211e);
+  border-radius: 20px;
+  box-shadow: var(--sh-3);
+  padding: 22px;
+}
+.demo-intro__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  margin: -6px -6px 16px;
+  border-radius: 14px;
+  background: var(--c-pine, #1f2e2a);
+  color: #fff;
+}
+.demo-intro__head h2 { font-size: 18px; font-weight: 800; margin: 0; }
+.demo-intro__en { font-size: 12px; opacity: 0.65; margin: 2px 0 0; text-align: right; }
+.demo-intro__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.demo-intro__list li {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  border: 1px solid var(--c-line, #dad9d0);
+  border-radius: 12px;
+}
+.demo-intro__list li b { color: var(--c-pine, #1f2e2a); }
+.demo-intro__list span,
+.demo-intro__note span {
+  display: block;
+  font-size: 12px;
+  color: rgba(26, 33, 30, 0.55);
+  text-align: left;
+  margin-top: 2px;
+}
+.demo-intro__note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fbf1ea;
+  color: #7a3a14;
+  font-size: 13px;
+  font-weight: 600;
+}
+.demo-intro__note span { color: rgba(122, 58, 20, 0.7); font-weight: 500; }
+.demo-intro__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.demo-intro__actions button {
+  flex: 1 1 180px;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.demo-intro__start { background: var(--c-clay, #b5561f); color: #fff; border: 0; }
+.demo-intro__start:hover { background: var(--c-clay-2, #d9824c); }
+.demo-intro__sample { background: #fff; color: var(--c-pine, #1f2e2a); border: 1px solid var(--c-line, #dad9d0); }
+.demo-intro__sample:hover { background: var(--c-paper, #f4f5f1); }
+.demo-intro__credit { margin: 14px 0 0; text-align: center; font-size: 12px; color: rgba(26, 33, 30, 0.45); }
+
+html[data-theme="dark"] .demo-intro__card { background: var(--d-surface); color: var(--d-text); }
+html[data-theme="dark"] .demo-intro__head { background: var(--d-surface-2); }
+html[data-theme="dark"] .demo-intro__list li { border-color: var(--d-line); }
+html[data-theme="dark"] .demo-intro__list li b { color: #a9d8c4; }
+html[data-theme="dark"] .demo-intro__list span { color: rgba(230, 235, 232, 0.55); }
+html[data-theme="dark"] .demo-intro__note { background: rgba(181, 86, 31, 0.15); color: #f0b48d; }
+html[data-theme="dark"] .demo-intro__note span { color: rgba(240, 180, 141, 0.75); }
+html[data-theme="dark"] .demo-intro__sample { background: var(--d-surface-2); color: var(--d-text); border-color: var(--d-line); }
+html[data-theme="dark"] .demo-intro__credit { color: rgba(230, 235, 232, 0.45); }
+html[data-theme="dark"] .demo-pill { border: 1px solid var(--d-line); }

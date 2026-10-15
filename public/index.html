@@ -861,7 +861,8 @@
             </button>
           </div>
           <button id="fabToggle" class="fab-toggle" aria-label="الإجراءات" aria-expanded="false" aria-controls="fabMenu">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <svg class="fab-ico-burger" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <svg class="fab-ico-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
         </div>
@@ -1311,6 +1312,7 @@
         function setOpen(open) {
           dock.classList.toggle("is-open", open);
           toggle.setAttribute("aria-expanded", open ? "true" : "false");
+          toggle.setAttribute("aria-label", open ? "إغلاق القائمة" : "الإجراءات");
           menu.setAttribute("aria-hidden", open ? "false" : "true");
         }
         toggle.addEventListener("click", function (e) {
