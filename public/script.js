@@ -1800,6 +1800,11 @@ el.statusToggle.addEventListener("click", () => {
   // معاينة حية لسطر "تم التسليم..." فور التبديل، قبل الحفظ الفعلي حتى —
   // حتى يشوف المستخدم النتيجة أثناء التسليم مباشرة وليس بعد إغلاق النافذة.
   const record = allRecords.find((r) => r.id === openRecordId);
+
+  // اسم المستلم لا معنى له لسجل غير مُسلَّم: نفرّغه عند إلغاء التسليم، ونرجّع
+  // قيمته المحفوظة لو أُعيد التبديل لـ "تم الاستلام" قبل الحفظ.
+  el.receiverInput.value = nextChecked ? record?.__receiver || "" : "";
+
   if (!nextChecked) {
     renderDeliveryAttribution(null);
   } else if (record?.__deliveredAt) {
@@ -1845,9 +1850,13 @@ el.drawerSave.addEventListener("click", async () => {
   const statusChecked = el.statusToggle.dataset.checked === "true";
   let receiverValue = el.receiverInput.value.trim();
 
-  // لو تُرك اسم المستلم فاضياً، نعتبره استلمه المستفيد نفسه (بدل تكرار اسمه
+  // سجل غير مُسلَّم لا يحمل اسم مستلم إطلاقاً.
+  // ولو سُلِّم وتُرك الاسم فاضياً، نعتبره استلمه المستفيد نفسه (بدل تكرار اسمه
   // الكامل تلقائياً — القيمة الثابتة "نفسه" أوضح وأسرع قراءة بالتقرير).
-  if (!receiverValue) {
+  if (!statusChecked) {
+    receiverValue = "";
+    el.receiverInput.value = "";
+  } else if (!receiverValue) {
     receiverValue = "نفسه";
     el.receiverInput.value = receiverValue; // انعكاس فوري بالحقل بالواجهة
   }
